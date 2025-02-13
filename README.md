@@ -3,7 +3,7 @@
 ## Programming Assignment 1
 cs726_pass_1.ipynb has Junction tree with separator sets for message passing constructed. 
 
-Useful methods for message passing: 
+**Useful methods for message passing:**
 
 self.maximal_cliques = list of cliques. Each clique = list of nodes in that clique, eg C1 = [0,1]
 
