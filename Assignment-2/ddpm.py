@@ -37,10 +37,7 @@ class NoiseScheduler():
         """
         Precompute whatever quantities are required for training and sampling
         """
-
-        self.betas = torch.linspace(beta_start, beta_end, self.num_timesteps, dtype=torch.float32)
-
-        self.alphas = None
+        pass
 
     def __len__(self):
         return self.num_timesteps
@@ -102,6 +99,9 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
         epochs: int, number of epochs to train the model
         run_name: str, path to save the model
     """
+    pass
+
+            
 
 @torch.no_grad()
 def sample(model, n_samples, noise_scheduler, return_intermediate=False): 
