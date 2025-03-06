@@ -9,16 +9,19 @@ class PositionalEncoding(nn.Module):
         super().__init__()
         self.embedDimension = embedDimension
 
-    def forward(self, time):
+    def forward(self, time : torch.Tensor):
         # time : [batchSize]
         device = time.device
         halfDimension = self.embedDimension // 2
         # Create a vector of position
-        embeds = math.log(10000) / (halfDimension - 1)
-        embeds = torch.exp(torch.arange(halfDimension, device=device, dtype=torch.float) * -embeds)
-        embeds = time[:, None] * embeds[None, :]
-        embeds = torch.cat((embeds.sin(), embeds.cos()), dim=-1)
-        return embeds
+        scale = math.log(10000) / (halfDimension - 1)
+        exponents = torch.arange(halfDimension, device=device, dtype=torch.float) * -scale
+        exponents = exponents.unsqueeze(0).unsqueeze(0)
+        time = time.float().unsqueeze(-1)
+        print(time.shape)
+        sinuosoidInput = time * exponents
+        embeddings = torch.cat([torch.sin(sinuosoidInput), torch.cos(sinuosoidInput)], dim=-1)
+        return embeddings
 
 
 # Define a class for the UNet Module
@@ -128,10 +131,8 @@ class UNetModel(nn.Module):
     
 
 if __name__ == '__main__':
-    # Test the UNetModel class
-    model = UNetModel()
-    input = torch.randn(4, 3, 256, 256)
-    timeEmbed = torch.randn(4, 256)
-    output = model(input, timeEmbed)
-    # Print the model
-    print(model(input, timeEmbed).shape)
+    # Test the PositionalEncoding class
+    time = torch.arange(200)
+    posEnc = PositionalEncoding(256)
+    output = posEnc(time)
+    print(output.shape)
