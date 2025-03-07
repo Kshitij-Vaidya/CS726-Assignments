@@ -2,137 +2,131 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from typing import Optional
 
-# Define a class for the positional encoding 
-class PositionalEncoding(nn.Module):
-    def __init__(self, embedDimension):
+
+class TimeEmbedding(nn.Module):
+    def __init__(self, numChannels: int):
         super().__init__()
-        self.embedDimension = embedDimension
-
-    def forward(self, time : torch.Tensor):
-        # time : [batchSize]
-        device = time.device
-        halfDimension = self.embedDimension // 2
-        # Create a vector of position
-        scale = math.log(10000) / (halfDimension - 1)
-        exponents = torch.arange(halfDimension, device=device, dtype=torch.float) * -scale
-        exponents = exponents.unsqueeze(0).unsqueeze(0)
-        time = time.float().unsqueeze(-1)
-        print(time.shape)
-        sinuosoidInput = time * exponents
-        embeddings = torch.cat([torch.sin(sinuosoidInput), torch.cos(sinuosoidInput)], dim=-1)
+        # numChannels is the number of channels in the input
+        self.numChannels = numChannels
+        # Define the layers of the Multi Layer Perceptron (MLP) Model
+        self.linear1 = nn.Linear(self.numChannels // 4, 
+                                 self.numChannels)
+        self.activation = nn.SiLU()
+        self.linear2 = nn.Linear(self.numChannels, 
+                                 self.numChannels)
+    
+    def forward(self, timeInput: torch.Tensor):
+        halfDim = self.numChannels // 8
+        embeddings = math.log(10000) / (halfDim - 1)
+        embeddings = torch.exp(torch.arange(halfDim) * -embeddings).to(timeInput.device)
+        embeddings = timeInput[:, None] * embeddings[None, :]
+        embeddings = torch.cat([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
+        # Pass the embeddings through the linear and activation layers
+        embeddings = self.linear1(embeddings)
+        embeddings = self.activation(embeddings)
+        embeddings = self.linear2(embeddings)
+        # Return the final embeddings of the time input
         return embeddings
 
 
-# Define a class for the UNet Module
-class UNetBlock(nn.Module):
-    def __init__(self, inputChannels, outputChannels, timeEmbedDimensions, numGroups = 8, isTimeEmbedding=True):
+# Define the Residual Block class that has convolution layers with group normalisation
+class ResidualBlock(nn.Module):
+    def __init__(self, inputChannels: int, outputChannels: int,
+                 timeChannels: int, numGroups: int = 32, dropout: float = 0.1):
         super().__init__()
-        self.convLayer1 = nn.Conv2d(inputChannels, outputChannels, kernel_size=3, padding=1)
-        self.convLayer2 = nn.Conv2d(outputChannels, outputChannels, kernel_size=3, padding=1)
-        self.groupNorm1 = nn.GroupNorm(numGroups, outputChannels)
-        self.groupNorm2 = nn.GroupNorm(numGroups, outputChannels)
-        self.timeEmbedProj = nn.Linear(timeEmbedDimensions, outputChannels)
-        self.activationLayer = nn.SiLU()
-        self.isTimeEmbedding = isTimeEmbedding
-    
-    def forward(self, input, timeEmbed):
-        output = self.convLayer1(input)
-        output = self.groupNorm1(output)
-        output = self.activationLayer(output)
-        # Add the time embedding
-        if self.isTimeEmbedding:
-            output = output + self.timeEmbedProj(timeEmbed)[:, :, None, None]
-        output = self.convLayer2(output)
-        output = self.groupNorm2(output)
-        output = self.activationLayer(output)
-        return output
+        # Define group normalisation and the first layer
+        self.norm1 = nn.GroupNorm(numGroups, inputChannels)
+        self.activation1 = nn.SiLU()
+        self.convLayer1 = nn.Conv2d(inputChannels, outputChannels,
+                                    kernel_size=3, padding=1)
+        # Define the second layer with group normalisation
+        self.norm2 = nn.GroupNorm(numGroups, outputChannels)
+        self.activation2 = nn.SiLU()
+        self.convLayer2 = nn.Conv2d(outputChannels, outputChannels,
+                                    kernel_size=3, padding=1)
         
-# Define a self attention class
-class SelfAttention(nn.Module):
-    def __init__(self, channels, numGroups=8):
-        super().__init__()
-        self.groupNorm = nn.GroupNorm(numGroups, channels)
-        self.query = nn.Conv2d(channels, channels, kernel_size=1)
-        self.key = nn.Conv2d(channels, channels, kernel_size=1)
-        self.value = nn.Conv2d(channels, channels, kernel_size=1)
-        self.projOut = nn.Conv2d(channels, channels, kernel_size=1)
+        # If the input and output layers are not the same, then use a shortcut connection
+        if inputChannels != outputChannels:
+            self.shortcut = nn.Conv2d(inputChannels, outputChannels, kernel_size=1)
+        else:
+            self.shortcut = nn.Identity()
 
-    def forward(self, input):
-        B, C, H, W = input.shape
-        h = self.groupNorm(input)
-        query = self.query(h).reshape(B, C, -1)
-        key = self.key(h).reshape(B, C, -1)
-        value = self.value(h).reshape(B, C, -1)
-        # Compute the attention weights
-        attention = torch.bmm(query.permute(0, 2, 1), key)
-        attention = attention / math.sqrt(C)
-        attention = F.softmax(attention, dim=-1)
-        output = torch.bmm(value, attention.permute(0, 2, 1))
-        output = output.reshape(B, C, H, W)
-        output = self.projOut(output)
-        return input + output # Residual connection
+        # Add the linear layer for the time embeddings
+        self.timeEmbedding = nn.Linear(timeChannels, outputChannels)
+        self.timeActivation = nn.SiLU()
+        # Define the dropout layer
+        self.dropout = nn.Dropout(dropout)
 
-
-
-# Define a class for the DDPM model as a UNet Module using the UNetBlock and SelfAttention classes
-class UNetModel(nn.Module):
-    def __init__(self, inputChannels = 3, 
-                 outputChannels = 3, 
-                 baseChannels = 64, 
-                 timeEmbedDimension = 256):
-        super().__init__()
-        # Define the downsample path
-        self.downsampleBlock1 = UNetBlock(inputChannels, baseChannels, timeEmbedDimension)
-        self.downsamplePool1 = nn.MaxPool2d(2)
-        self.downsampleBlock2 = UNetBlock(baseChannels, baseChannels * 2, timeEmbedDimension)
-        self.downsamplePool2 = nn.MaxPool2d(2)
-        self.downsampleBlock3 = UNetBlock(baseChannels * 2, baseChannels * 4, timeEmbedDimension)
-
-        # Add a self attention layer with 16*16 resolution
-        self.selfAttention = SelfAttention(baseChannels * 4)
-        self.dowmsamplePool3 = nn.MaxPool2d(2)  
-        # Bottle neck layer
-        self.bottleNeckLayer = UNetBlock(baseChannels * 4, baseChannels * 8, timeEmbedDimension)
-
-        # Define the upsample path
-        self.upsampleLayer3 = nn.ConvTranspose2d(baseChannels * 8, baseChannels * 4, kernel_size=2, stride=2)
-        self.upsampleBlock3 = UNetBlock(baseChannels * 8, baseChannels * 4, timeEmbedDimension)
-        self.upsampleLayer2 = nn.ConvTranspose2d(baseChannels * 4, baseChannels * 2, kernel_size=2, stride=2)
-        self.upsampleBlock2 = UNetBlock(baseChannels * 4, baseChannels * 2, timeEmbedDimension)
-        self.upsampleLayer1 = nn.ConvTranspose2d(baseChannels * 2, baseChannels, kernel_size=2, stride=2)
-        self.upsampleBlock1 = UNetBlock(baseChannels * 2, baseChannels, timeEmbedDimension)
-
-        self.outputConvLayer = nn.Conv2d(baseChannels, outputChannels, kernel_size=1)
-    
-
-    def forward(self, input, timeEmbed):
-        # Downsample path
-        down1 = self.downsampleBlock1(input, timeEmbed)
-        pool1 = self.downsamplePool1(down1)
-        down2 = self.downsampleBlock2(pool1, timeEmbed)
-        pool2 = self.downsamplePool2(down2)
-        down3 = self.downsampleBlock3(pool2, timeEmbed)
-        # Self attention layer
-        down3 = self.selfAttention(down3)
-        pool3 = self.dowmsamplePool3(down3)
-        # Bottle neck layer
-        bottleNeck = self.bottleNeckLayer(pool3, timeEmbed)
-        # Upsample path
-        up3 = self.upsampleLayer3(bottleNeck)
-        up3 = self.upsampleBlock3(torch.cat([down3, up3], dim=1), timeEmbed)
-        up2 = self.upsampleLayer2(up3)
-        up2 = self.upsampleBlock2(torch.cat([down2, up2], dim=1), timeEmbed)
-        up1 = self.upsampleLayer1(up2)
-        up1 = self.upsampleBlock1(torch.cat([down1, up1], dim=1), timeEmbed)
-        # Output layer
-        output = self.outputConvLayer(up1)
+    def forward(self, input: torch.Tensor, time: torch.Tensor):
+        # Passing the input through the first layer
+        outLayer1 = self.norm1(input)
+        outLayer1 = self.activation1(outLayer1)
+        outLayer1 = self.convLayer1(outLayer1)
+        # Add the time embeddings to the output of the first layer
+        outLayer1 = outLayer1 + self.timeActivation(self.timeEmbedding(time))[:, :, None, None]
+        # Pass the output through the second layer
+        outLayer2 = self.norm2(outLayer1)
+        outLayer2 = self.activation2(outLayer2)
+        outLayer2 = self.dropout(outLayer2)
+        outLayer2 = self.convLayer2(outLayer2)
+        # Add the shortcut connection
+        output = outLayer2 + self.shortcut(input)
         return output
     
+
+# Define the Attention Block 
+class AttentionBlock(nn.Module):
+    def __init__(self, numChannels: int, numHeads: int = 1, headDim: int = None, numGroups = 32):
+        super().__init__()
+        if headDim is None:
+            headDim = numChannels
+        # Define the normalisation layer
+        self.norm = nn.GroupNorm(numGroups, numChannels)
+
+        self.projection = nn.Linear(numChannels, numHeads * headDim * 3)
+
+        self.output = nn.Linear(numHeads * headDim, numChannels)
+        # Scale for dot product attention
+        self.scale = headDim ** -0.5
+        self.numHeads = numHeads
+        self.headDim = headDim
+
+    def forward(self, input: torch.Tensor, time: Optional[torch.Tensor] = None):
+        batchSize, numChannels, height, width = input.shape 
+        input = input.view(batchSize, numChannels, -1).permute(0, 2, 1)
+        input = self.projection(input).view(batchSize, -1, self.numHeads, self.headDim * 3)
+
+        query, key, value = input.chunk(3, dim=-1)
+        attention = torch.einsum('b i h d, b j h d -> b i j h', query, key) * self.scale
+        attention = F.softmax(attention, dim=2)
+
+        result = torch.einsum('b i j h, b j h d -> b i h d', attention, value)
+        result = result.reshape(batchSize, -1, self.numHeads * self.headDim)
+        result = self.output(result)
+        # Adding the skip connection
+        output = result + input
+        output = output.permute(0, 2, 1).view(batchSize, numChannels, height, width)
+        return output
+    
+
 
 if __name__ == '__main__':
-    # Test the PositionalEncoding class
-    time = torch.arange(200)
-    posEnc = PositionalEncoding(256)
-    output = posEnc(time)
-    print(output.shape)
+    # Instantiate and test the TimeEmbedding module
+    timeEmbed = TimeEmbedding(numChannels=128)
+    test_time_input = torch.randn(4)
+    time_output = timeEmbed(test_time_input)
+    print("Time embedding output shape:", time_output.shape)
+
+    # Instantiate and test the ResidualBlock
+    resBlock = ResidualBlock(32, 64, 128)
+    res_input = torch.randn(1, 32, 16, 16)
+    res_time = torch.randn(1, 128)
+    res_output = resBlock(res_input, res_time)
+    print("Residual block output shape:", res_output.shape)
+
+    # Instantiate and test the AttentionBlock
+    attBlock = AttentionBlock(numChannels=64, numHeads=2, headDim=32)
+    att_output = attBlock(res_output)
+    print("Attention block output shape:", att_output.shape)
