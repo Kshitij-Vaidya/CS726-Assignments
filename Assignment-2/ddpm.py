@@ -9,6 +9,7 @@ import utils
 import dataset
 import os
 import matplotlib.pyplot as plt
+from helperClasses import TimeEmbedding, UNetModel
 
 class NoiseScheduler():
     """
