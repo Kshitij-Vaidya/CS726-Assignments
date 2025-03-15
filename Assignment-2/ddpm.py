@@ -9,7 +9,9 @@ import utils
 import dataset
 import os
 import matplotlib.pyplot as plt
-from helperClasses import TimeEmbedding, UNetModel
+import numpy as np
+from helperClasses import (TimeEmbedding, ResidualMLPModel, 
+                           MLPModel, ConditionalMLPModel)
 
 class NoiseScheduler():
     """
@@ -38,7 +40,13 @@ class NoiseScheduler():
         """
         Precompute whatever quantities are required for training and sampling
         """
-        pass
+        self.betaSchedule = torch.linspace(beta_start, beta_end, self.num_timesteps)
+        self.alpha = 1 - self.betaSchedule
+        self.alphaProd = torch.cumprod(self.alpha, 0)
+        self.sqrtCumprodAlpha = np.sqrt(self.alphaProd)
+        self.sqrtAlpha = np.sqrt(self.alpha)
+        self.sqrtOneMinusAlpha = np.sqrt(1 - self.alpha)
+        self.sqrtOneMinusAlphaProd = torch.sqrt(1 - self.alphaProd)
 
     def __len__(self):
         return self.num_timesteps
@@ -54,8 +62,14 @@ class DDPM(nn.Module):
         We have separate learnable modules for `time_embed` and `model`. `time_embed` can be learned or a fixed function as well
 
         """
-        self.time_embed = None
-        self.model = None
+        super().__init__()
+        self.n_dim = n_dim
+        self.n_steps = n_steps
+        self.time_embed_dim = n_dim
+        self.time_embed = TimeEmbedding(self.time_embed_dim)
+        # self.model = MLPModel(n_dim, self.time_embed_dim)
+        # self.model = AdvancedMLPModel(n_dim, self.time_embed_dim)
+        self.model = ResidualMLPModel(n_dim, self.time_embed_dim)
 
     def forward(self, x, t):
         """
@@ -66,9 +80,15 @@ class DDPM(nn.Module):
         Returns:
             torch.Tensor, the predicted noise tensor [batch_size, n_dim]
         """
-        pass
+        # Get the time embeddings
+        timeEmbeddings = self.time_embed(t)
+        # Concatenate the input data with the time embeddings
+        input = torch.cat([x, timeEmbeddings], dim=-1)
+        # Get the predicted noise
+        noise = self.model(input)
+        return noise
 
-class ConditionalDDPM():
+class ConditionalDDPM(nn.Module):
     pass
     
 class ClassifierDDPM():
@@ -76,8 +96,16 @@ class ClassifierDDPM():
     ClassifierDDPM implements a classification algorithm using the DDPM model
     """
     
-    def __init__(self, model: ConditionalDDPM, noise_scheduler: NoiseScheduler):
-        pass
+    def __init__(self, model: ConditionalDDPM, noise_scheduler: NoiseScheduler,
+                 n_dim : int, n_classes : int, n_steps : int):
+        super().__init__()
+        self.n_dim = n_dim
+        self.n_steps = n_steps
+        self.time_embed_dim = n_dim
+        self.class_embed_dim = n_classes
+        self.time_embed = TimeEmbedding(self.time_embed_dim)
+        self.class_embed = nn.Embedding(n_classes, n_dim)
+        self.model = ConditionalMLPModel(n_dim, self.time_embed_dim, self.class_embed_dim)
 
     def __call__(self, x):
         pass
@@ -88,7 +116,10 @@ class ClassifierDDPM():
     def predict_proba(self, x):
         pass
 
-def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
+def train(model : DDPM, noise_scheduler : NoiseScheduler, 
+          dataloader: torch.utils.data.DataLoader, 
+          optimizer: torch.optim.Optimizer, 
+          epochs : int, run_name : str):
     """
     Train the model and save the model and necessary plots
 
@@ -100,7 +131,37 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
         epochs: int, number of epochs to train the model
         run_name: str, path to save the model
     """
-    pass
+    model.train()
+    lossFunction = nn.MSELoss()
+    device = next(model.parameters()).device
+    prevEpochLoss = -float('inf')
+    bestModel = None
+    for epoch in range(epochs):
+        epochLoss = 0
+        for x, _ in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}"):
+            x = x.to(device)
+            # print(x)
+            # Define the random time step
+            timesteps = torch.randint(0, noise_scheduler.num_timesteps, 
+                                      (x.shape[0],), device=device)
+            # Get the noise
+            # print(timesteps)
+            noise = torch.randn_like(x)
+            noisyInput = (noise_scheduler.sqrtCumprodAlpha[timesteps, None] * x 
+                          + noise_scheduler.sqrtOneMinusAlphaProd[timesteps, None] * noise)
+            # print(noisyInput)
+            optimizer.zero_grad()
+            predictedNoise = model(noisyInput, timesteps)
+            # print(predictedNoise)
+            loss = lossFunction(predictedNoise, noise)
+            loss.backward()
+            optimizer.step()
+            epochLoss += loss.item()
+        print(f"Epoch {epoch+1}/{epochs} Loss: {epochLoss/len(dataloader)}")
+        if epochLoss < prevEpochLoss:
+            prevEpochLoss = epochLoss
+            bestModel = model.state_dict()
+    torch.save(bestModel, f'{run_name}/model.pth')
 
             
 
@@ -124,7 +185,22 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         Return: [[n_samples, n_dim]] x n_steps
         Optionally implement return_intermediate=True, will aid in visualizing the intermediate steps
     """   
-    pass
+    device = next(model.parameters()).device
+    model.eval()
+    samples = [] if return_intermediate else None
+    numDim = model.model.inputDim
+    inputs = torch.randn(n_samples, numDim, device=device)
+
+    for timestep in reversed(range(0, noise_scheduler.num_timesteps)):
+        timesteps = torch.full((n_samples,), timestep, device=device)
+        noisePred = model(inputs, timesteps)
+        inputs = ((inputs - ((1.0 - noise_scheduler.alpha[timestep]) / noise_scheduler.sqrtOneMinusAlphaProd[timestep]) * noisePred)
+                  / noise_scheduler.sqrtAlpha[timestep])
+        if return_intermediate:
+            samples.append(inputs.clone().cpu().numpy())
+    if return_intermediate:
+        return samples
+    return inputs
 
 def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     """
@@ -183,15 +259,20 @@ if __name__ == "__main__":
     model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps)
     noise_scheduler = NoiseScheduler(num_timesteps=args.n_steps, beta_start=args.lbeta, beta_end=args.ubeta)
     model = model.to(device)
-
+    # print(model)
     if args.mode == 'train':
         epochs = args.epochs
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         data_X, data_y = dataset.load_dataset(args.dataset)
         # can split the data into train and test -- for evaluation later
         data_X = data_X.to(device)
-        data_y = data_y.to(device)
-        dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_X, data_y), batch_size=args.batch_size, shuffle=True)
+        if args.dataset != 'albatross':
+            data_y = data_y.to(device)
+        else:
+            data_y = torch.Tensor([0] * data_X.shape[0]).to(device)
+        dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_X, data_y), 
+                                                 batch_size=args.batch_size, 
+                                                 shuffle=True)
         train(model, noise_scheduler, dataloader, optimizer, epochs, run_name)
 
     elif args.mode == 'sample':
