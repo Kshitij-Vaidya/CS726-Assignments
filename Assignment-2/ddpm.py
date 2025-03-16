@@ -203,7 +203,7 @@ class ClassifierDDPM():
         proba = self.predict_proba(x)
         return torch.argmax(proba, dim=1)
     
-    
+
 
 def train(model : DDPM, noise_scheduler : NoiseScheduler, 
           dataloader: torch.utils.data.DataLoader, 
@@ -252,7 +252,52 @@ def train(model : DDPM, noise_scheduler : NoiseScheduler,
             bestModel = model.state_dict()
     torch.save(bestModel, f'{run_name}/model.pth')
 
-            
+def trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_name, cond_dropout=0.2):
+    """
+    Train the conditional model with classifier-free guidance.
+    
+    Args:
+        model: ConditionalDDPM, the model to train.
+        noise_scheduler: NoiseScheduler, provides noise schedule parameters.
+        dataloader: torch.utils.data.DataLoader, training data.
+        optimizer: torch.optim.Optimizer, optimizer.
+        epochs: int, number of epochs.
+        run_name: str, name used for saving the trained model.
+        cond_dropout: float, probability to drop the condition (simulate unconditional training).
+    """
+    # Move noise scheduler tensors to the correct device
+    device = torch.device("cpu")
+    noise_scheduler.sqrtCumprodAlpha = noise_scheduler.sqrtCumprodAlpha.to(device)
+    noise_scheduler.sqrtOneMinusAlphaProd = noise_scheduler.sqrtOneMinusAlphaProd.to(device)
+    noise_scheduler.sqrtAlpha = noise_scheduler.sqrtAlpha.to(device)
+    noise_scheduler.alpha = noise_scheduler.alpha.to(device)
+
+    model.train()
+    lossFunction = nn.MSELoss()
+    for epoch in range(epochs):
+        epochLoss = 0
+        for x, y in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}"):
+            x = x.to(device)
+            y = y.to(device)
+            # Random timesteps for each sample.
+            timesteps = torch.randint(0, noise_scheduler.num_timesteps, (x.shape[0],), device=device)
+            noise = torch.randn_like(x)
+            noisyInput = (noise_scheduler.sqrtCumprodAlpha[timesteps, None] * x +
+                          noise_scheduler.sqrtOneMinusAlphaProd[timesteps, None] * noise)
+            optimizer.zero_grad()
+            # With probability cond_dropout, drop the condition.
+            if torch.rand(1).item() < cond_dropout:
+                y_input = None
+            else:
+                y_input = y
+            predictedNoise = model(noisyInput, timesteps, y_input)
+            loss = lossFunction(predictedNoise, noise)
+            loss.backward()
+            optimizer.step()
+            epochLoss += loss.item()
+        print(f"Epoch {epoch+1}/{epochs} Loss: {epochLoss/len(dataloader)}")
+    torch.save(model.state_dict(), f'models/{run_name}.pth')
+
 
 @torch.no_grad()
 def sample(model, n_samples, noise_scheduler, return_intermediate=False): 
@@ -291,54 +336,9 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         return samples
     return inputs
 
-def trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_name, cond_dropout=0.2):
-    """
-    Train the conditional model with classifier-free guidance.
-    
-    Args:
-        model: ConditionalDDPM, the model to train.
-        noise_scheduler: NoiseScheduler, provides noise schedule parameters.
-        dataloader: torch.utils.data.DataLoader, training data.
-        optimizer: torch.optim.Optimizer, optimizer.
-        epochs: int, number of epochs.
-        run_name: str, name used for saving the trained model.
-        cond_dropout: float, probability to drop the condition (simulate unconditional training).
-    """
-    # Move noise scheduler tensors to the correct device
-    device = next(model.parameters()).device
-    noise_scheduler.sqrtCumprodAlpha = noise_scheduler.sqrtCumprodAlpha.to(device)
-    noise_scheduler.sqrtOneMinusAlphaProd = noise_scheduler.sqrtOneMinusAlphaProd.to(device)
-    noise_scheduler.sqrtAlpha = noise_scheduler.sqrtAlpha.to(device)
-    noise_scheduler.alpha = noise_scheduler.alpha.to(device)
-
-    model.train()
-    lossFunction = nn.MSELoss()
-    for epoch in range(epochs):
-        epochLoss = 0
-        for x, y in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}"):
-            x = x.to(device)
-            y = y.to(device)
-            # Random timesteps for each sample.
-            timesteps = torch.randint(0, noise_scheduler.num_timesteps, (x.shape[0],), device=device)
-            noise = torch.randn_like(x)
-            noisyInput = (noise_scheduler.sqrtCumprodAlpha[timesteps, None] * x +
-                          noise_scheduler.sqrtOneMinusAlphaProd[timesteps, None] * noise)
-            optimizer.zero_grad()
-            # With probability cond_dropout, drop the condition.
-            if torch.rand(1).item() < cond_dropout:
-                y_input = None
-            else:
-                y_input = y
-            predictedNoise = model(noisyInput, timesteps, y_input)
-            loss = lossFunction(predictedNoise, noise)
-            loss.backward()
-            optimizer.step()
-            epochLoss += loss.item()
-        print(f"Epoch {epoch+1}/{epochs} Loss: {epochLoss/len(dataloader)}")
-    torch.save(model.state_dict(), f'models/{run_name}.pth')
 
 @torch.no_grad()
-def sampleConditional(model, n_samples, noise_scheduler, class_label: int, guidance_scale=0.0):
+def sampleConditional(model, n_samples, noise_scheduler, class_label: int, guidance_scale=0.0, return_intermediate=False):
     """
     Sample from the model using classifier-free guidance for a fixed class label.
     
@@ -354,12 +354,14 @@ def sampleConditional(model, n_samples, noise_scheduler, class_label: int, guida
         torch.Tensor of shape [n_samples, n_dim] with generated samples, or
         a list of intermediate steps if return_intermediate=True.
     """
-    device = next(model.parameters()).device
+    device = torch.device("cpu")
     model.eval()
     numDim = model.n_dim
     inputs = torch.randn(n_samples, numDim, device=device)
     # Use a fixed class label for all samples
     y = torch.full((n_samples,), class_label, dtype=torch.long, device=device)
+
+    samples = [] if return_intermediate else None
 
     for timestep in reversed(range(noise_scheduler.num_timesteps)):
         timesteps = torch.full((n_samples,), timestep, device=device)
@@ -377,9 +379,11 @@ def sampleConditional(model, n_samples, noise_scheduler, class_label: int, guida
         inputs = ((inputs - ((1.0 - noise_scheduler.alpha[timestep]) / 
                   noise_scheduler.sqrtOneMinusAlphaProd[timestep]) * noisePred)
                   / noise_scheduler.sqrtAlpha[timestep])
-        
+        if return_intermediate:
+            samples.append(inputs.clone().cpu().numpy())
+    if return_intermediate:
+        return samples
     return inputs
-
 
 def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     """
