@@ -5,6 +5,7 @@ import warnings
 from jaxtyping import Bool, Float, Int
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from typing import List
+from collections import defaultdict
 
 warnings.filterwarnings("ignore")
 
@@ -53,7 +54,70 @@ class ConstrainedTextGenerator:
             Returns:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
-        # TODO:
-        raise NotImplementedError
+        trie = Trie(self.tokenizer)
+        for word in word_list:
+            trie.insert(word)
         
+        generatedTokens = []
+        pastKeyValues = None
+        currentInput = input_ids
+
+        for _ in range(self.max_output_len):
+            outputs = self.model(currentInput,
+                                 past_key_values=pastKeyValues)
+            logits = outputs.logits[:, -1, :]
+            pastKeyValues = outputs.past_key_values
+
+            probabilities = torch.nn.functional.softmax(logits, dim=-1)
+            sortedTokens = torch.argsort(probabilities, descending=True)
+            nextToken = None
+
+            for token in sortedTokens.squeeze(0):
+                token = token.item()
+                if trie.startsWith(generatedTokens + [token]):
+                    nextToken = token
+                    break
+            if nextToken is None or nextToken == self.eos_token_id:
+                break
+                
+            generatedTokens.append(nextToken)
+            currentInput = torch.tensor([[nextToken]]).to(input_ids.device)
         
+        return torch.tensor(generatedTokens, dtype=torch.long)
+        
+
+
+# Implement a Trie Class to handle the word list
+class TrieNode:
+    def __init__(self):
+        self.children = defaultdict(TrieNode)
+        self.isEndOfWord = False
+    
+
+class Trie:
+    def __init__(self, tokenizer):
+        self.root = TrieNode()
+        self.tokenizer = tokenizer
+    
+    def insert(self, word):
+        tokens = self.tokenizer.encode(word, add_special_tokens=False)
+        node = self.root
+        for token in tokens:
+            node = node.children[token]
+        node.isEndOfWord = True
+    
+    def startsWith(self, prefixTokens):
+        node = self.root
+        for token in prefixTokens:
+            if token not in node.children:
+                return False
+            node = node.children[token]
+        return True
+
+    def validCompletion(self, prefixTokens) -> Bool:
+        node = self.root
+        for token in prefixTokens:
+            if token not in node.children:
+                return False
+            node = node.children[token]
+        return node.isEndOfWord
