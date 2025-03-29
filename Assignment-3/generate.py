@@ -14,7 +14,7 @@ class TextGenerator:
         model: AutoModelForCausalLM, 
         decoding_strategy: str, 
         eos_id: int, 
-        max_output_len: int = 10,
+        max_output_len: int = 100,
         tau: int = 1,
         k: int = 10,
         p: int = 0.5
@@ -57,6 +57,7 @@ class TextGenerator:
         '''
             Do not edit.
         '''
+        print("[TASK 0] Decoder Called ...")
         return self.generator_func(input_ids)
                 
     def greedy_decoding(
@@ -80,20 +81,27 @@ class TextGenerator:
         '''    
         generateTokens = []
         currentInput = input_ids
+        past_key_values = None
 
-        for _  in range(self.max_output_len):
+        for i in range(self.max_output_len):
+            # if i % 20 == 0:
+                # print(f"[TASK 0] Greedy Decoding Stage {i} ...")
             # Get the output logits
-            output = self.model(currentInput)
-            logits = output.logits[:, -1, :] # Take the last token's logits
+            with torch.no_grad():
+                output = self.model(currentInput, past_key_values = past_key_values)
+                # print("[TASK 0] Model Output Received ...")
+                logits = output.logits[:, -1, :] # Take the last token's logits
+                past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None
             # Select the token with the highest probability
             nextToken = torch.argmax(logits, dim=-1)
             # Stop if the token is EOS
             if nextToken.item() == self.eos_token_id:
+                print("[DEBUG] EOS token detected ... Breaking from the loop")
                 break
             # Append the token to the generated tokens
             generateTokens.append(nextToken.item())
             # Update the input for the next iteration
-            currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+            currentInput = nextToken.unsqueeze(0).to(input_ids.device)
         return torch.tensor(generateTokens, dtype=torch.long)
         
     def random_sampling(
@@ -117,22 +125,30 @@ class TextGenerator:
         '''    
         generatedTokens = []
         currentInput = input_ids
+        past_key_values = None
 
-        for _ in range(self.max_output_len):
-            # Get the output model logits
-            output = self.model(currentInput)
-            logits = output.logits[:, -1, :] # Take the last token's logits
-            # Apply temperature to the logits
-            probabilities = nn.functional.softmax(logits / self.tau, dim=-1)
-            # Sample a token from the distribution
-            nextToken = torch.multinomial(probabilities, num_samples=1)
-            # Stop if the token is EOS
-            if nextToken.item() == self.eos_token_id:
-                break
-            # Append the token to the generated tokens
-            generatedTokens.append(nextToken.item())
-            # Update the input for the next iteration
-            currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+        with torch.no_grad():
+            for i in range(self.max_output_len):
+                # print(f"[DEBUG] Processing {i} ... ")
+                # Get the output model logits
+                output = self.model(currentInput, past_key_values = past_key_values)
+                logits = output.logits[:, -1, :] # Take the last token's logits
+                past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None
+                # Apply temperature to the logits
+                probabilities = nn.functional.softmax(logits / self.tau, dim=-1)
+                # Sample a token from the distribution
+                nextToken = torch.multinomial(probabilities, num_samples=1)
+                # Stop if the token is EOS
+                if nextToken.item() == self.eos_token_id:
+                    break
+                # Append the token to the generated tokens
+                generatedTokens.append(nextToken.item())
+                # Update the input for the next iteration
+                if past_key_values is None:
+                    currentInput = torch.cat([currentInput, nextToken], dim=1)
+                else:
+                    currentInput = nextToken
+
         return torch.tensor(generatedTokens, dtype=torch.long)
     
     def topk_sampling(
@@ -156,23 +172,30 @@ class TextGenerator:
         '''    
         generatedTokens = []
         currentInput = input_ids
+        past_key_values = None
 
-        for _ in range(self.max_output_len):
-            # Get the output model logits
-            output = self.model(currentInput)
-            logits = output.logits[:, -1, :]
-            # Select the top-k tokens
-            topkLogits, topkIndices = torch.topk(logits, self.k, dim=-1)
-            probabilities = nn.functional.softmax(topkLogits.values / self.tau, dim=-1)
-            # Sample a token from the distribution
-            nextToken = topkIndices[0, torch.multinomial(probabilities, num_samples=1)]
-            # Stop if the token is EOS
-            if nextToken.item() == self.eos_token_id:
-                break
-            # Append the token to the generated tokens
-            generatedTokens.append(nextToken.item())
-            # Update the input for the next iteration
-            currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+        with torch.no_grad():
+            for i in range(self.max_output_len):
+                # print(f"[DEBUG] Processing {i} ... ")
+                # Get the output model logits
+                output = self.model(currentInput, past_key_values = past_key_values)
+                logits = output.logits[:, -1, :]
+                past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None
+                # Select the top-k tokens
+                topkLogits, topkIndices = torch.topk(logits, self.k, dim=-1)
+                probabilities = nn.functional.softmax(topkLogits / self.tau, dim=-1)
+                # Sample a token from the distribution
+                nextToken = topkIndices[0, torch.multinomial(probabilities, num_samples=1).squeeze(1)]
+                # Stop if the token is EOS
+                if nextToken.item() == self.eos_token_id:
+                    break
+                # Append the token to the generated tokens
+                generatedTokens.append(nextToken.item())
+                # Update the input for the next iteration
+                if past_key_values is None:
+                    currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+                else:
+                    currentInput = nextToken.unsqueeze(0)
         return torch.tensor(generatedTokens, dtype=torch.long)
     
     def nucleus_sampling(
@@ -196,28 +219,41 @@ class TextGenerator:
         '''    
         generatedTokens = []
         currentInput = input_ids
+        past_key_values = None
 
-        for _ in range(self.max_output_len):
-            # Get the output model logits
-            output = self.model(currentInput)
-            logits = output.logits[:, -1, :]
-            # Sort the logits and compute the cumulative distribution
-            sortedLogits, sortedIndices = torch.sort(logits, descending=True, dim=-1)
-            probabilities = nn.functional.softmax(sortedLogits / self.tau, dim=-1)
-            cumulativeProbabilities = torch.cumsum(probabilities, dim=-1)
-            # Keep only the tokens within the nucleus (top-p)
-            nucleusMask = cumulativeProbabilities <= self.p
-            nucleusLogits = sortedLogits[nucleusMask]
-            nucleusIndices = sortedIndices[nucleusMask]
-            # Sample a token from the distribution
-            nucleusProbabilities = nn.functional.softmax(nucleusLogits, dim=-1)
-            nextToken = nucleusIndices[torch.multinomial(nucleusProbabilities, num_samples=1)]
+        with torch.no_grad():
+            for i in range(self.max_output_len):
+                print(f"[DEBUG] Processing {i} ... ")
+                # Get the output model logits
+                output = self.model(currentInput)
+                logits = output.logits[:, -1, :]
+                past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None
+                # Sort the logits and compute the cumulative distribution
+                sortedLogits, sortedIndices = torch.sort(logits, descending=True, dim=-1)
+                probabilities = nn.functional.softmax(sortedLogits / self.tau, dim=-1)
+                cumulativeProbabilities = torch.cumsum(probabilities, dim=-1)
+                # Keep only the tokens within the nucleus (top-p)
+                nucleusMask = cumulativeProbabilities <= self.p
+                if not torch.any(nucleusMask):
+                    nucleusMask[:, 0] = True
+                nucleusLogits = sortedLogits[nucleusMask].unsqueeze(0)
+                nucleusIndices = sortedIndices[nucleusMask].unsqueeze(0)
 
-            # Stop if the token is EOS
-            if nextToken.item() == self.eos_token_id:
-                break
-            # Append the token to the generated tokens
-            generatedTokens.append(nextToken.item())
-            # Update the input for the next iteration
-            currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+                if nucleusLogits.numel() == 0:
+                    nucleusLogits = sortedLogits[:, :1]
+                    nucleusIndices = sortedIndices[:, :1] 
+                # Sample a token from the distribution
+                nucleusProbabilities = nn.functional.softmax(nucleusLogits, dim=-1)
+                nextToken = nucleusIndices[0, torch.multinomial(nucleusProbabilities, num_samples=1).squeeze(1)]
+
+                # Stop if the token is EOS
+                if nextToken.item() == self.eos_token_id:
+                    break
+                # Append the token to the generated tokens
+                generatedTokens.append(nextToken.item())
+                # Update the input for the next iteration
+                if past_key_values is None:
+                    currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+                else:
+                    currentInput = nextToken.unsqueeze(0)
         return torch.tensor(generatedTokens, dtype=torch.long) 

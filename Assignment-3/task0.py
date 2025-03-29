@@ -68,17 +68,20 @@ if __name__ == "__main__":
     
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=args.hf_token)
     tokenizer.pad_token = tokenizer.eos_token    
-    model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=torch.float16, token=args.hf_token).to(device)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=torch.float16, token=args.hf_token, device_map="cpu")
+    model.to(device)
     model.eval()
+    print("[TASK 0] Loaded Model ...")
     generator = TextGenerator(model=model, decoding_strategy=args.decoding_strategy, eos_id=tokenizer.eos_token_id, max_output_len=args.max_output_len, tau=args.tau, k=args.k, p=args.p)
-    
+    print("[TASK 0] Defined Text Generator ...")
     # Load dataset
     dataloader = get_dataloader(tokenizer, args.hf_token, max_input_len=args.max_input_len)
-    
+    print("[TASK 0] Defined Dataloader ...")
     reference_texts = []
     generated_texts = []
   
     total = len(dataloader)
+    print("[TASK 0] Enumerating Through Dataloader ...")
     for i, batch in enumerate(dataloader):
         input_prompt, ground_truth = batch 
         
