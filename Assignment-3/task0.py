@@ -82,6 +82,9 @@ if __name__ == "__main__":
   
     total = len(dataloader)
     print("[TASK 0] Enumerating Through Dataloader ...")
+    filePath = 'results/nucleus_0.95.txt'
+    with open(filePath, 'w') as f:
+        f.write("")
     for i, batch in enumerate(dataloader):
         input_prompt, ground_truth = batch 
         
@@ -104,6 +107,18 @@ if __name__ == "__main__":
             print('Ground Truth:', generated_texts[-1])
             print()
             print()
+
+            debug_info = [f'Example: {i+1}/{total}',
+            f'Input Prompt:', tokenizer.decode(input_prompt['input_ids'][0]),
+            'Reference:', reference_texts[-1],
+            'Ground Truth:', generated_texts[-1],
+            '\n'
+            ]
+
+            with open(filePath, 'a') as f:
+                for line in debug_info:
+                    f.write(line + '\n')
+
     
     bleu = evaluate.load('bleu')
     rouge = evaluate.load('rouge')
@@ -112,5 +127,8 @@ if __name__ == "__main__":
     rouge_score = rouge.compute(predictions=generated_texts, references=reference_texts)
     
     print(f"""BLEU: {bleu_score['bleu']}\nROUGE-1: {float(rouge_score['rouge1'])}\nROUGE-2: {float(rouge_score['rouge2'])}\nROUGE-LCS: {float(rouge_score['rougeL'])}""")
+    scorePath = 'results/scores.txt'
+    with open(scorePath, 'a') as f:
+        f.write(f"""BLEU: {bleu_score['bleu']}\nROUGE-1: {float(rouge_score['rouge1'])}\nROUGE-2: {float(rouge_score['rouge2'])}\nROUGE-LCS: {float(rouge_score['rougeL'])}""")
         
         

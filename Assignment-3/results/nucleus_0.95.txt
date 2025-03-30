@@ -1,0 +1,13 @@
+Example: 1/50
+Input Prompt:
+<s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+सेवा संबंधी लोगों के लिए भेष कई गुणों का संयोजन है, जैसे कि उनके जूते, कपड़े, टाई, आभूषण, केश शैली, मेक-अप, घड़ी, कॉस्मेटिक, इत्र, आदि।
+
+completion:
+Reference:
+an appearance is a bunch of attributes related to the service person like their shoes clothes tie jewellery hairstyle makeup watch cosmetics perfume etc
+Ground Truth:
+सेवा संबंधी लोगों के लिए इंग्लिश का भेष अल्प आभूषण कई गुणों का संयोजन है जैसे कि उनके जूते कपड़े टाई आभूषण केश शैली मेकअप घड़ी क�
+
+

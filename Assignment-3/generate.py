@@ -198,6 +198,8 @@ class TextGenerator:
                     currentInput = nextToken.unsqueeze(0)
         return torch.tensor(generatedTokens, dtype=torch.long)
     
+
+
     def nucleus_sampling(
         self, 
         input_ids: Int[torch.Tensor, "batch in_seq_len"]
@@ -219,41 +221,43 @@ class TextGenerator:
         '''    
         generatedTokens = []
         currentInput = input_ids
-        past_key_values = None
+        past_key_values = None 
 
-        with torch.no_grad():
-            for i in range(self.max_output_len):
-                print(f"[DEBUG] Processing {i} ... ")
-                # Get the output model logits
-                output = self.model(currentInput)
+        for i in range(self.max_output_len):
+            # Forward pass through the model
+            with torch.no_grad():
+                output = self.model(currentInput, past_key_values = past_key_values)
                 logits = output.logits[:, -1, :]
-                past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None
-                # Sort the logits and compute the cumulative distribution
-                sortedLogits, sortedIndices = torch.sort(logits, descending=True, dim=-1)
-                probabilities = nn.functional.softmax(sortedLogits / self.tau, dim=-1)
-                cumulativeProbabilities = torch.cumsum(probabilities, dim=-1)
-                # Keep only the tokens within the nucleus (top-p)
-                nucleusMask = cumulativeProbabilities <= self.p
-                if not torch.any(nucleusMask):
-                    nucleusMask[:, 0] = True
-                nucleusLogits = sortedLogits[nucleusMask].unsqueeze(0)
-                nucleusIndices = sortedIndices[nucleusMask].unsqueeze(0)
+                past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None 
+            logits = logits / self.tau
+            probabilities = nn.functional.softmax(logits, dim=-1).squeeze()
+            sortedProbabilities, sortedIndices = torch.sort(probabilities, descending=True)
 
-                if nucleusLogits.numel() == 0:
-                    nucleusLogits = sortedLogits[:, :1]
-                    nucleusIndices = sortedIndices[:, :1] 
-                # Sample a token from the distribution
-                nucleusProbabilities = nn.functional.softmax(nucleusLogits, dim=-1)
-                nextToken = nucleusIndices[0, torch.multinomial(nucleusProbabilities, num_samples=1).squeeze(1)]
+            cumProbs = torch.cumsum(sortedProbabilities, dim=0)
+            nucleusMask = cumProbs <= self.p
 
-                # Stop if the token is EOS
-                if nextToken.item() == self.eos_token_id:
-                    break
-                # Append the token to the generated tokens
-                generatedTokens.append(nextToken.item())
-                # Update the input for the next iteration
-                if past_key_values is None:
-                    currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
-                else:
-                    currentInput = nextToken.unsqueeze(0)
-        return torch.tensor(generatedTokens, dtype=torch.long) 
+            if not torch.any(nucleusMask):
+                nucleusMask[0] = True 
+
+            # Get the indices of the selected tokens
+            selectedIndices = sortedIndices[nucleusMask]
+            selectedProbabilities = sortedProbabilities[nucleusMask]
+            # Renormalise the probabilites
+            print(f"[DEBUG] Probability Sum : {torch.sum(selectedProbabilities)}")
+            selectedProbabilities = selectedProbabilities / torch.sum(selectedProbabilities)
+
+            # Sample from the selected tokens
+            nextToken = torch.multinomial(selectedProbabilities, num_samples=1)
+            nextToken = selectedIndices[nextToken]
+
+            generatedTokens.append(nextToken.item())
+
+            if nextToken.item() == self.eos_token_id:
+                break
+
+            if past_key_values is None:
+                currentInput = torch.cat([currentInput, nextToken.unsqueeze(0)], dim=-1)
+            else:
+                currentInput = nextToken.unsqueeze(0)
+        return torch.tensor(generatedTokens, dtype=torch.long)
+
