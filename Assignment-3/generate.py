@@ -227,9 +227,9 @@ class TextGenerator:
             # Forward pass through the model
             with torch.no_grad():
                 output = self.model(currentInput, past_key_values = past_key_values)
-                logits = output.logits[:, -1, :]
+                logits = output.logits[:, -1, :] / self.tau
                 past_key_values = output.past_key_values if hasattr(output, "past_key_values") else None 
-            logits = logits / self.tau
+
             probabilities = nn.functional.softmax(logits, dim=-1).squeeze()
             sortedProbabilities, sortedIndices = torch.sort(probabilities, descending=True)
 
@@ -237,14 +237,17 @@ class TextGenerator:
             nucleusMask = cumProbs <= self.p
 
             if not torch.any(nucleusMask):
-                nucleusMask[0] = True 
+                nucleusMask[:1] = True 
 
             # Get the indices of the selected tokens
             selectedIndices = sortedIndices[nucleusMask]
             selectedProbabilities = sortedProbabilities[nucleusMask]
             # Renormalise the probabilites
-            print(f"[DEBUG] Probability Sum : {torch.sum(selectedProbabilities)}")
-            selectedProbabilities = selectedProbabilities / torch.sum(selectedProbabilities)
+            totalSelectedProb = torch.sum(selectedProbabilities)
+            if totalSelectedProb > 0:
+                selectedProbabilities = selectedProbabilities / totalSelectedProb
+            else:
+                selectedProbabilities = torch.ones_like(selectedProbabilities) / selectedProbabilities.shape[0]
 
             # Sample from the selected tokens
             nextToken = torch.multinomial(selectedProbabilities, num_samples=1)

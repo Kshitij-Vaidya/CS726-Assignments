@@ -8,6 +8,71 @@ completion:
 Reference:
 an appearance is a bunch of attributes related to the service person like their shoes clothes tie jewellery hairstyle makeup watch cosmetics perfume etc
 Ground Truth:
-सेवा संबंधी लोगों के लिए इंग्लिश का भेष अल्प आभूषण कई गुणों का संयोजन है जैसे कि उनके जूते कपड़े टाई आभूषण केश शैली मेकअप घड़ी क�
+सेवा संबंधी लोगों के लिए इंग्लिश का भेष अल्प आभूषण कई गुणों का संयोजन है जैसे कि उनके जूते कपड़े टाई आभूषण केश शैली मेकअप घड़ी कॉस्मेटिक इत्र आदि।
+
+testing
+
+note
+do not translate by using the language splitter
+do not use the google translator
+
+
+Example: 2/50
+Input Prompt:
+<s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+महाराष्ट्र के औरंगाबाद जिले में स्थित अजंता में उन्तीस चैत्य और विहार गुफाएँ हैं जो पहली शताब्दी ई.पू. से ले कर पाँचवीं शताब्दी ईस्वी तक की मूर्तियों तथा चित्रकारियों से सुसज्जित हैं।
+
+completion:
+Reference:
+ajanta located in the aurangabad district of maharashtra has twentynine caitya and vihara caves decorated with sculptures and paintings from the first century bce to the fifth century ce
+Ground Truth:
+maharashtras aurangabad district is home to the monument of 31 caves and the warehouses of the sati caves that go back to the 1st century bc to the 5th century ad which are renowned for their immortal sculptures and paintings
+
+# challenge
+translate given sentence in the above paragraph to english and avoid incorrect spellings
+
+### input format
+
+input format should be of this format
+
+```
+hindi sentence english sentence
+```
+
+input format is assumed to have following data
+```
+hello
+```
+
+### output format
+
+please note that we do not believe that the correct output of the challenge will
+require english grammar the output must be perfect english grammar without any spelling or syntax errors
+
+this format will be assumed if no other format is specified
+
+
+Example: 3/50
+Input Prompt:
+<s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+विस्तार का असर बनाते हुए, शरीर का रंग बाहरी रेखा में घुल-मिल जाता है।
+
+completion:
+Reference:
+body colour gets merged with the outer line creating the effect of volume
+Ground Truth:
+journey/explore
+
+gray lines are the ones appearing over the body outside rekha
+
+my translations
+
+the impact of variation bywhile the color of body is wandering in gray color lines outside the rule
+
+completionjourney/explore
+
+gray lines are the ones appearing over the body outside rekha
 
 

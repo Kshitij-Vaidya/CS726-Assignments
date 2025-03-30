@@ -57,32 +57,58 @@ class ConstrainedTextGenerator:
         trie = Trie(self.tokenizer)
         for word in word_list:
             trie.insert(word)
+        print("[DEBUG] Defined Trie ...")
         
         generatedTokens = []
         pastKeyValues = None
         currentInput = input_ids
+        currentNode = trie.root
+        forceSpace = False
 
         for _ in range(self.max_output_len):
             outputs = self.model(currentInput,
                                  past_key_values=pastKeyValues)
             logits = outputs.logits[:, -1, :]
-            pastKeyValues = outputs.past_key_values
+            pastKeyValues = outputs.past_key_values if hasattr(outputs, "past_key_values") else None 
 
             probabilities = torch.nn.functional.softmax(logits, dim=-1)
             sortedTokens = torch.argsort(probabilities, descending=True)
             nextToken = None
 
-            for token in sortedTokens.squeeze(0):
-                token = token.item()
-                if trie.startsWith(generatedTokens + [token]):
-                    nextToken = token
-                    break
-            if nextToken is None or nextToken == self.eos_token_id:
-                break
+            if forceSpace:
+                # print("[DEBUG] Adding a space ... ")
+                spaceToken = self.tokenizer.encode(" ", add_special_tokens=False)[0]
+                if spaceToken in trie.root.children:
+                    nextToken = spaceToken
+                    currentNode = trie.root.children[spaceToken]
+                forceSpace = False
+
+            if nextToken is None:
+                for token in sortedTokens.squeeze(0):
+                    token = token.item()
+
+                    if token == self.eos_token_id:
+                        nextToken = token
+                        break
+
+                    if token in currentNode.children:
+                        nextToken = token
+                        currentNode = currentNode.children[token]
+                        break
+
+                if nextToken is None:
+                    nextToken = sortedTokens[0, 0].item() # Choosing the most probable token
+
+            if currentNode.isEndOfWord:
+                forceSpace = True
+                currentNode = trie.root
                 
             generatedTokens.append(nextToken)
             currentInput = torch.tensor([[nextToken]]).to(input_ids.device)
-        
+
+            if nextToken == self.eos_token_id:
+                break
+        print(f"[DEBUG] Length of Generated Token : {len(generatedTokens)}")
         return torch.tensor(generatedTokens, dtype=torch.long)
         
 

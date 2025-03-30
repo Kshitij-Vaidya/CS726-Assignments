@@ -33,16 +33,20 @@ if __name__ == "__main__":
     tokenizer.pad_token = tokenizer.eos_token    
     model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=torch.float16, token=args.hf_token).to(device)
     model.eval()
+    print("[DEBUG] Loaded Model ... ")
     generator = ConstrainedTextGenerator(model=model, tokenizer=tokenizer, eos_id=tokenizer.eos_token_id, max_output_len=args.max_output_len)
-    
+    print("[DEBUG] Constrained Text Generator Defined ...")
     # Load dataset
     dataloader = get_dataloader(tokenizer, args.hf_token, max_input_len=args.max_input_len)
-    
+    print("[DEBUG] Loaded Dataloader ... ")
     reference_texts = []
     generated_texts = []
     
     total = len(dataloader)
-  
+    filePath = 'results/constrained.txt'
+    with open(filePath, 'w') as f:
+        f.write("")
+
     for i, batch in enumerate(dataloader):
         input_prompt, ground_truth = batch 
         
@@ -65,6 +69,16 @@ if __name__ == "__main__":
             print('Ground Truth:', generated_texts[-1])
             print()
             print()
+
+            lines = [f'Example: {i+1}/{total}', f'Input Prompt:', tokenizer.decode(input_prompt['input_ids'][0]),
+            'Reference:', reference_texts[-1], 
+            'Ground Truth:', generated_texts[-1],
+            '\n']
+
+            with open(filePath, 'a') as f:
+                for line in lines:
+                    f.write(line + '\n')
+
     
     bleu = evaluate.load('bleu')
     rouge = evaluate.load('rouge')
@@ -73,5 +87,7 @@ if __name__ == "__main__":
     rouge_score = rouge.compute(predictions=generated_texts, references=reference_texts)
     
     print(f"""BLEU: {bleu_score['bleu']}\nROUGE-1: {float(rouge_score['rouge1'])}\nROUGE-2: {float(rouge_score['rouge2'])}\nROUGE-LCS: {float(rouge_score['rougeL'])}""")
-        
-        
+    scorePath = 'results/scores.txt'
+    with open(scorePath, 'a') as f:
+        f.write("Task 1\n")
+        f.write(f"""BLEU: {bleu_score['bleu']}\nROUGE-1: {float(rouge_score['rouge1'])}\nROUGE-2: {float(rouge_score['rouge2'])}\nROUGE-LCS: {float(rouge_score['rougeL'])}\n\n""")        

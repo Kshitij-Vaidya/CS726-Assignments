@@ -129,6 +129,7 @@ if __name__ == "__main__":
     print(f"""BLEU: {bleu_score['bleu']}\nROUGE-1: {float(rouge_score['rouge1'])}\nROUGE-2: {float(rouge_score['rouge2'])}\nROUGE-LCS: {float(rouge_score['rougeL'])}""")
     scorePath = 'results/scores.txt'
     with open(scorePath, 'a') as f:
+        f.write(f"{args.decoding_strategy}_p{args.p}")
         f.write(f"""BLEU: {bleu_score['bleu']}\nROUGE-1: {float(rouge_score['rouge1'])}\nROUGE-2: {float(rouge_score['rouge2'])}\nROUGE-LCS: {float(rouge_score['rougeL'])}""")
         
         
