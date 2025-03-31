@@ -1,0 +1,643 @@
+Namespace(model_name='FasterDecoding/medusa-v1.0-vicuna-7b-v1.5', use_no_medusa_heads=2, max_input_len=1000, max_output_len=500, beam_width=5, decoding_strategy='multi-head', debug=True)
+LlamaForCausalLM has generative capabilities, as `prepare_inputs_for_generation` is explicitly overwritten. However, it doesn't directly inherit from `GenerationMixin`. From 👉v4.50👈 onwards, `PreTrainedModel` will NOT inherit from `GenerationMixin`, and this model will lose the ability to call `generate` and other related functions.
+  - If you're using `trust_remote_code=True`, you can get rid of this warning by loading the model with an auto class. See https://huggingface.co/docs/transformers/en/model_doc/auto#auto-classes
+  - If you are the owner of the model architecture code, please modify your model class such that it inherits from `GenerationMixin` (after `PreTrainedModel`, otherwise you'll get an exception).
+  - If you are not the owner of the model architecture class, please contact the model code owner to update it.
+Loading checkpoint shards: 100%|████████████████████████████████████████████████████████████████████████████████| 2/2 [00:00<00:00,  4.75it/s]
+Example: 1/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+सेवा संबंधी लोगों के लिए भेष कई गुणों का संयोजन है, जैसे कि उनके जूते, कपड़े, टाई, आभूषण, केश शैली, मेक-अप, घड़ी, कॉस्मेटिक, इत्र, आदि।
+
+completion:
+Reference: an appearance is a bunch of attributes related to the service person like their shoes clothes tie jewellery hairstyle makeup watch cosmetics perfume etc
+Ground Truth: 
+
+For people related to the service, there are a number of qualities that are suitable, such as their shoes, clothing, tie, suit, coat, shirt, tie, hat, shoes, etc.
+
+
+Example: 2/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+महाराष्ट्र के औरंगाबाद जिले में स्थित अजंता में उन्तीस चैत्य और विहार गुफाएँ हैं जो पहली शताब्दी ई.पू. से ले कर पाँचवीं शताब्दी ईस्वी तक की मूर्तियों तथा चित्रकारियों से सुसज्जित हैं।
+
+completion:
+Reference: ajanta located in the aurangabad district of maharashtra has twentynine caitya and vihara caves decorated with sculptures and paintings from the first century bce to the fifth century ce
+Ground Truth: 
+In the city of Angabada in the Maharastra state, 31 chait and 1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+
+
+Example: 3/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+विस्तार का असर बनाते हुए, शरीर का रंग बाहरी रेखा में घुल-मिल जाता है।
+
+completion:
+Reference: body colour gets merged with the outer line creating the effect of volume
+Ground Truth: 
+
+As a result, the skin color changes and the body appears in the outer circle.
+
+Note: The above sentence is not a complete sentence, it is a phrase or a sentence fragment.
+
+
+Example: 4/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+अशोक ने व्यापक रूप से मूर्तियों और शानदार स्मारकों को बनाने के लिए पत्थर का प्रयोग करना शुरू किया, जबकि उससे पहले पारंपरिक रूप से लकड़ी और मिट्टी का प्रयोग किया जाता है।
+
+completion:
+Reference: ashoka started making extensive use of stone for sculptures and great monuments whereas the previous tradition consisted of working with wood and clay
+Ground Truth: 
+
+Ashok has started using the stone to make mortar and beautiful marks, while before that it was used for traditional wood and mud.
+
+Note: I have translated the sentence as close to the original sentence as possible, but it may not be the most natural or accurate translation in English, as it is a machine translation and my knowledge cut off is 2008, and I may not have the context of the sentence, so please consider it as a rough translation, and if there is any need for a more accurate one, please let me know, and I will be happy to help.
+
+
+Example: 5/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+महाराष्ट्र के इस स्वादिष्ट और प्रसिद्ध व्यंजन में आलुओं में मसाले को मिलाकर, बेसन के घोल की परत लगाकर, उसे अच्छी तरह से तल कर बनाया जाता है।
+
+completion:
+Reference: potatoes mixed in masalas coated in besan batter and deep fried to perfection form this delicious and famous dish of maharashtra
+Ground Truth: 
+In the famous and delicious food of India, the spice mix is found in the bread, and the bread is made by spreading the bread crumbs, and the bread is made in a better way by spreading the crust of the bread and making it crisp.
+
+
+Example: 6/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+चेट्टिनाड भोजन तमिल नाडु के चेट्टिनाड क्षेत्र के नाट्टूकोटाई चेट्टियार नामक समुदाय या खुद को नागारथार कहने वालों का भोजन है।
+
+completion:
+Reference: chettinad cuisine is the cuisine of a community called the nattukotai chettiars or nagarathars as they call themselves from the chettinad region of tamil nadu state
+Ground Truth: 
+
+The food of Chettinadu is known as a delicious dish in the region of South India, and it is also called the food of the people who are known as the Nadu Nattu Koottayam or the Nagaramathar community.
+
+
+Example: 7/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+दालचीनी मूल रूप से भारत की है और इस रूप में इसका प्रयोग स्वादिष्टकारक से लेकर औषधीय कारक के रूप में किया जाता है।
+
+completion:
+Reference: cinnamon is native to india and as such its uses range from that of a flavoring agent to a medicinal agent
+Ground Truth: 
+Dalchini or cardamom has its original in India and its use is made from a fragrant to an herbal drug.
+
+Note: The sentence is a bit long, but it can be broken into smaller parts for better translation.
+
+
+Example: 8/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+सूखे ग्राइंडर में या फिर पत्थर के मूसल में इसका चूर्ण बना लें।
+
+completion:
+Reference: make this into powder with a dry grinder or in a stone pestle
+Ground Truth: 
+In a green ground or on a stone table, make a curve of this.
+
+
+Example: 9/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+पंजाब के हर शहर की अपनी पसंद है, जैसे कि अमृतसर के लोग विशेष रूप से अमृतसरी कुलचे, भरवां पराठें और दूध के उत्पाद पसंद करते हैं।
+
+completion:
+Reference: each city in punjab has varied preferences like people in amritsar are particularly fond of amritsari kulche stuffed paranthas and milk products
+Ground Truth: 
+
+Every city has its own style, such as the people of Ajmer like special Ajmeri cups, full of milk, sugar, and other products. A
+
+
+Example: 10/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+राम को ऋषि के साथ भेज दो, और लक्ष्मण को भी भेज दो।
+
+completion:
+Reference: send rama with the sage and send lakshmana too
+Ground Truth: 
+
+Ram should be placed next to Rishis, and also place Lakshman next to Ram.
+
+
+Example: 11/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+परंतु मंगल पांडे ने यह साहसिक कारनामा एक ऊँचे और श्रेष्ठ सिद्धांत के प्रति समर्पण के लिए किया।
+
+completion:
+Reference: but mangal pandeys brave deed was done through devotion to a high and noble principle
+Ground Truth: 
+"But Pandu, in a brave and noble manner, made a union with a higher and superior principle."
+
+Note: I have translated the sentence as per the context provided, but if you have any alternative suggestions, feel free to let me know and I will be happy to provide an alternative translation accordingly.
+
+
+Example: 12/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+प्याज जब पारभासी हो जाए तो उसमें मसालों के मिश्रण में कुछ समय से रखे गए मांस और पिसी हल्दी डाल कर 5-6 मिनट तक हल्का-सा तलते रहें जब तक कि मांस सभी मसालों को सोख न ले।
+
+completion:
+Reference: once the onions are translucent add the marinated mutton with turmeric powder and saute for some time until all the spices are absorbed in the mutton for about 56 minutes
+Ground Truth: 
+When paj is paratha, it is filled with masalas, and some meat and pisi halli dal is kept for a while until the meat is well cooked, and then the halli dal is added for a while until the masalas are completely mixed, and then the meat is added to the masalas, and then the parathas are served.
+
+
+Example: 13/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+हितोपदेश एक पुस्तक है जिसमें सांसारिक ज्ञान पक्षियों, पशुओं, और मनुष्यों के चरित्रों के माध्यम से प्रस्तुत किया गया है।
+
+completion:
+Reference: hitopadesa is a book of worldly wisdom presented through the characters of birds animals and humans
+Ground Truth: 
+
+"The book "HitoPadesh" contains knowledge of various animals, animals, and human characters, presented in a way that is accessible to all."
+
+Note: The translation is a direct and literal translation, and may not be a natural or accurate translation in English.
+
+
+Example: 14/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+ऐसा प्रतीत होता है कि पुस्तक का उद्देश्य संस्कृत अभिव्यक्ति में प्रवीणता और विवेकपूर्ण व्यवहार के ज्ञान को प्रोत्साहित करना है।
+
+completion:
+Reference: the purpose of the book appears to encourage proficiency in sanskrit expression and the knowledge of wise behaviour
+Ground Truth: 
+
+The sentence you provided is already in English.
+
+
+Example: 15/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+प्रोफेसर असितकुमार बन्दोपाध्याय ने 1994 और 1995 में अपने गृह-नगर, हावड़ा के संपूर्ण इतिहास को हावड़ा शहरेर इतिवृत्त (पहला और दूसरा खंड) नाम से संकलित करने में महत्वपूर्ण भूमिका निभाई है।
+
+completion:
+Reference: professor asitkumar bandyopadhyay played a pioneering role in compiling the complete history of his hometown howrah titled as howrah saharer itibrrito (first and second volume) in 1994 & 1995
+Ground Truth: 
+The Professor Asitumara Bhandary, in 1949 and 155, has completed the complete history of their home-village, Hawa, in the Hawa city, and has named it as a valuable contribution to the city history, first and second time.
+
+Note: I have corrected the year 155 as 155, as it is not a year.
+
+
+Example: 16/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+चैत्य के सभागृह में सामने की ओर अर्ध-वृत्ताकार चैत्य चाप रूपांकित है जिसका सामने का हिस्सा खुला है जहां पर लकड़ी का भवनमुख है और किसी-किसी में मुख्य चैत्य चाप वाली खिड़की नहीं है।
+
+completion:
+Reference: the front of the caitya hall is dominated by the motif of a semicircular caitya arch with an open front that has a wooden facade and in some cases there is no dominating caitya arch window
+Ground Truth: 
+In the assembly hall of Caitanya, which is in the half-turned position, the main door is open, and there is an opening in the wall where an axe can be seen, which is not there in any of the rooms of the main building, and no main door is there in any of the rooms, and no main door in any of the rooms, and no main door in the main building, and no main building.
+
+
+Example: 17/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+महाराजों और खानसामों (जैसा कि कुशल रसोइयों को परंपरागत रूप से भारत में कहा जाता है) की पीढ़ियों ने सदियों से इन पाक-विधियों को परिपूर्ण कर दिया है और अब ये पाक-विधियाँ सहस्रों वर्षों में मौखिक परमपरा के माध्यम से आगे बढ़ती आई हैं।
+
+completion:
+Reference: generations ofmaharaj and khansamas (as expert chefs have traditionally been called in india) have perfected the recipes over centuries and these recipes have passed through oral tradition over thousands of years
+Ground Truth: 
+
+The Maharajas and the khanasamas (like the famous poets and writers who are considered to be part of the tradition of India) have, for centuries, made the poets of these poems a part of the tradition, and now these poetry has grown into a major cultural movement.
+
+
+Example: 18/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+पारंपरिक रूप से रसोइयों के दल की सहायता से तैयारी वास्ता वाज़ा, या प्रधान रसोइये द्वारा की जाती है।
+
+completion:
+Reference: the preparation is traditionally done by a vasta waza or head chef with the assistance of a court of wazas or chefs
+Ground Truth: 
+
+In English:
+
+"The blood cells are formed from the stem cells, or by the chief cells of the blood, or by the cells of the blood that are responsible for their formation."
+
+
+Example: 19/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+पाव भाजी: यह महाराष्ट्र का एक फास्ट फूड व्यंजन है, जिसमें सब्जियों का गाढ़ा मिश्रण होता है जिसे सामान्यतया मक्खन में पकाया जाता है और एक नर्म ब्रेड रोल (पाव) के साथ परोसा जाता है।
+
+completion:
+Reference: pav bhaji it is a fast food dish from maharashtra consisting of a thick vegetable curry (bhaji) usually prepared in butter and served with a soft bread roll (pav)
+Ground Truth: 
+
+Fast food in Maharashra: This is a fast food item from Maharshr, in which pieces of meat are mixed with a spicy paste, which is made into a roll of bread (paav) and served with it.
+
+Note: The translation is not a direct translation, as the meaning of the words in Hindi can be different in English, and the sentence has been translated to make it more natural in English, while maintaining the meaning. A
+
+
+Example: 20/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+हब्बा खातून और लल्ल-द्यद की कश्मीरी रचनाएं उनके आध्यात्मिक अंदाज़ और गहन भावनाओं की अभिव्यक्ति के लिए जानी जाती हैं, राजस्थान में मीराबाई की रचनाएं उनकी अद्वितीय भक्ति के लिए लोकप्रिय हैं, तमिल में आण्डाल का गूढ़ ज्ञान तथा कन्नड़ में अक्का महादेवी के वचन उस समय के साहित्य में महिलाओं के व्यापक योगदान के प्रमाण हैं।
+
+completion:
+Reference: the kashmiri compositions of lal ded and habba khatoon are known for their mystical flavour and intense agony of expression mirabais compositions in rajasthani is known for unique devotional quality andals mysticism in tamil and akka mahadevis vachanas in kannnada are testimonies to the great contribution of women to the literature of the time
+Ground Truth: 
+
+Habbatun, Lal-ll-dyad, and Kshmiri rachanae are known for their inner and deeper meanings, and their spiritual awareness, while the works of Meerabaei are known for their devotion, and in Tamil, and Andhala, the knowledge of Kannad Mahadevi and the speech of AcKa Mahadev are examples of the role of women in that time. A
+
+
+Example: 21/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+बाघ गुफाएं, जिनमें बौद्ध भित्ति चित्र बने हुए हैं, मध्य प्रदेश के धार ज़िले से 97 कि.मी. की दूरी पर स्थित हैं।
+
+completion:
+Reference: the bagh caves consisting of buddhist mural paintings are located 97 km from the dhar district of madhya pradesh
+Ground Truth: 
+
+The statue of Buddha was created in the foothills, where the distance to the central district of 97 km was located from the district root of Madh A
+
+
+Example: 22/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+संस्कृत साहित्य में मूल शब्द का सामान्य अर्थ है किसी पौधे या वृक्ष की जड़, किंतु लाक्षणिक रूप में, यह किसी भी वस्तु का निचला हिस्सा या तल हो सकता है।
+
+completion:
+Reference: the usual meaning of the word mula in sanskrit literature is the root of a plant or tree but figuratively the foot or lowest part or bottom of anything
+Ground Truth: 
+In the Hindi sentence "संस्krit साहit् मेन मूल शाहित्् क समान्न् अरथ हिस् किसि पहा॑थ यα विक्स्सु का जा॑॑ँ किन् तु लॉक्सि रुप میं یا تال حیات میگرا هستا هیا تال ها میجرا میکنا هستا هیا میکنا میکنا میکنا میکنا मिकनا मिकनا میکنا मिकنا میکنا میکنا میکنا मिकनا میकنا मिकنا मिकنا میکنا میکنا میکنا میکنا μικνα μικλα μικλλ μικλλ μ
+
+
+Example: 23/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+सिंधु घाटी सभ्यता विभिन्न क्षेत्रों में अपने तकनीकी ज्ञान के लिए जानी जाती है।
+
+completion:
+Reference: indus valley civilisation is known for its technological knowledge in a variety of fields
+Ground Truth: 
+"The sandy beach is known for its technology knowledge." A
+
+
+Example: 24/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+सभी कौरव मर जाते हैं; केवल पाँच पांडव भाई और कृष्ण जीवित बचते हैं।
+
+completion:
+Reference: all the kauravas die; only the five pandava brothers and krishna survive
+Ground Truth: 
+All the cows are killed; only Panch Pandu brother and Kriishn are alive.
+
+Note: The sentence has some errors and it is not a proper sentence, but it is a sentence that can be translated.
+
+
+Example: 25/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+युद्ध अठारह दिनों तक चलता रहता है और कौरवों की पराजय के साथ समाप्त होता है।
+
+completion:
+Reference: the battle rages for eighteen days and ends with the defeat of the kauravas
+Ground Truth: 
+
+The war has been going on for 10 days and is being won by the Kawas.
+
+
+Example: 26/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+महाभारत की केंद्रीय कथा हस्तिनापुर के सिंहासन पर उत्तराधिकार के लिए संघर्ष की कहानी है, एक ऐसा राज्य जो आधुनिक दिल्ली के ठीक उत्तर में है और जो भरत नाम से जानी जाने वाली एक जनजाति का पैतृक क्षेत्र है।
+
+completion:
+Reference: the central story of the mahabharata is a conflict over succession to the throne of hastinapura a kingdom just north of modern delhi that was the ancestral realm of a tribe most commonly known as the bharatas
+Ground Truth: 
+Mahatma Gandhi, the leader of the Indian freedom struggle, has a story about the central struggle for independence on the Hastingshan Palace, which is a palace in Delhi and is also the home of the Rajputs, an ancient and proud people. A
+
+
+Example: 27/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+कर्नाटक में शाकाहारी लोगों की संख्या मांसाहारी लोगों से अधिक है; इसलिए उनके भोजन में मुख्य रूप से शाकाहारी व्यंजन होते हैं।
+
+completion:
+Reference: the number of vegetarians exceeds the number of nonvegetarians in karnataka; therefore their cuisine mainly consists of vegetarian dishes
+Ground Truth: 
+
+The number of vegan people in Karanatak is more than those who eat meat; hence, the main ingredient of their main meal is mostly vegan.
+
+Note: The sentence is a bit complex, and it may not be a direct translation, but it is the closest possible translation that can be done with the given sentence.
+
+
+Example: 28/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+उन्हें संजय से, जो उन्हें बता रहा है कि युद्ध के मैदान में क्या हो रहा है, उत्तर मिलता है।
+
+completion:
+Reference: he is answered by sanjaya who relates what is happening on the battlefield
+Ground Truth: 
+Say, who is telling Jay that the war is going on in the field, and what is the answer.
+
+Note: I have translated the sentence as per the given context, and it may not be the exact translation of the sentence as it is written in the given context.
+
+
+Example: 29/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+तमिल में मिलने वाले दो महाकाव्य सिलप्पदिकारम् और मणिमेकलै हैं।
+
+completion:
+Reference: the two epics found in tamil are cilapathikaram and manimekalai
+Ground Truth: 
+
+"There are two great works in Tamil, and they are known as the Silppadikaram and Mekala."
+
+
+Example: 30/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+इस क्षेत्र में मिर्च के पाउडर का उपयोग सावधानी से किया जाता है।
+
+completion:
+Reference: the use of chilli powder in this region is done cautiously
+Ground Truth: 
+This sentence is about the use of mirrors in a particular area, and it's translated to:
+
+"In this use of mirrors in the area must be careful."
+
+
+Example: 31/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+योग शब्द संस्कृत की युज् धातु से निकला है, जिसका अर्थ है जोड़ना या जोतना या सम्मिलित करना।
+
+completion:
+Reference: the word yoga is derived from the sanskrit root yuj meaning to join or to yoke or to unite
+Ground Truth: 
+
+Yoga word is made up of Hindi words, which means to join, to or to join.
+
+
+Example: 32/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+आज का ओड़िसी उड़ीसा के मंदिरों की दीवारों पर विभिन्न रूपांकनों में उत्कीर्ण अनगिनत प्रतिमाओं से विकसित हुआ है।
+
+completion:
+Reference: todays odissi has evolved from the endless sculptures in various motifs carved on the temple walls of orissa
+Ground Truth: 
+
+Tod AKAudisaa's temple on the wall of the Odisha temple, different representations of the vivid images of the sun have been made. A
+
+
+Example: 33/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+वशिष्ठ अब राजा की ओर घूमे और धीरे से बोले: "राजा , आपको शोभा नहीं देता कि आपने जिस चीज़ का एक बार वचन दिया था उससे आप मुकर जाएं।
+
+completion:
+Reference: vasishtha now turned to the king and spoke gently "it ill becomes you king to refuse having promised once"
+Ground Truth: 
+"King, I will not grant you peace, for you once spoke of something, and now you must go away."
+
+
+Example: 34/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+केवल तब जब उनको अर्जुन की हताशा की हद समझ में आई, कृष्ण ने अपना रवैया बदला और दुनिया में धार्मिक संघर्षों के रहस्य को सिखाना शुरू किया।
+
+completion:
+Reference: only when he realizes the extent of arjunas despondency does krishna change his attitude and start teaching the mysteries of dharmic action in this world
+Ground Truth: 
+
+Only when they realized the depth of Archer's fear, did they understand that they were on the brink of their own fear. Then, Krishna took his bow and changed it, and began to teach the world the truth of the religious struggles.
+
+Note that this is a translation of the original sentence, which is a bit longer and more complex, and may not be a direct translation of the original sentence. The goal is to convey the same meaning as original sentence in English, while being as accurate and as natural in English as possible.
+
+Note: The sentence is a bit longer, and it is a bit complex, and it is a bit more than 2000 characters.
+
+Note: I am not a machine, I am a human, and I am a professional translator and I have a degree in translation, and I have 10 years of experience in translation.
+
+Note: I am not a machine, and I have a good knowledge of English, and I can understand the context, and I can use the appropriate words, and I can make the sentence flow, and I can use the appropriate tone, and I can use the appropriate grammar, and I can be as accurate and as natural as possible.
+
+Note that the sentence is a bit more 2000, it is a bit more than 10000 characters.
+
+Note that I have a good knowledge of English and I have a good knowledge of the context and I can understand the sentence, and I can make
+
+
+Example: 35/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+जैसे-जैसे आप पात्र में चावल का आटा डाल रहे हों, बीच-बीच में आप कम मात्रा में घिसा हुआ नारियल भी डालें।
+
+completion:
+Reference: as you add the rice flour into the container in between you may also add small quantities of grated coconut
+Ground Truth: 
+As the patients continue to eat the chawal, they are gradually adding less and less oil to the between-bites.
+
+Note: I have translated the sentence based on the given context, but it may not be a literal translation as the meaning of the sentence can be understood from the context, and the literal meaning may not be the intended meaning.
+
+
+Example: 36/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+आप बेलनाकार पात्र में एक चम्मच-भर कद्दूकस किया हुआ नारियल मिला कर शुरू कर सकते हैं, जिसके बाद अच्छी तरह मिश्रित चावल का आटा उसमें मिला दें।
+
+completion:
+Reference: you may begin by adding a spoonful of grated coconut into the cylindrical container followed by the wellmixed rice flour
+Ground Truth: 
+You have made a mistake in the translation. A
+
+
+Example: 37/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+महाराजा रणजीत सिंह के दान के कारण 1835 ई. के आस-पास नांदेड में एक सुंदर और असाधारण गुरुद्वारे का निर्माण हुआ जिसमें जटिल नक्काशी वाला एक भव्य स्वर्ण गुंबद है।
+
+completion:
+Reference: maharaja ranjit singhs endowment saw the construction of a beautiful and breathtaking gurudwara featuring an imposing golden dome with intricate carving at nanded around 1835 ad
+Ground Truth: 1835 AE. In the surrounding areas of ​​1835 AD, an excellent and unprecedented building was built in ​​Maharaja Ranjit Singh, the gift of ​​1835 AD, which is an attractive and beautiful golden palace with a unique shape.
+
+
+Example: 38/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+सामवेद इन चुनी हुई ऋचाओं का एक संग्रह है जिन्हें प्रस्तावित छंद या लयबद्ध ताल पर निर्धारित करते हुए स्वरों में व्यवस्थित किया गया है।
+
+completion:
+Reference: samaveda is the compilation of these selected ruchas set to svaras keeping their proposed chanda or rhythmic meters
+Ground Truth: 
+
+"Samved is an collection of words that are arranged in a poem or a song, which are composed in a voice that is controlled by either a chand or a layabdaal, and are composed in the voice of a poet."
+
+Note: I have translated the sentence as it is written in the given text, but if you want a more natural or fluent version, please let me know, and I will be happy to retranslate it.
+
+Also, please let me know how you want the name of the work to be translated, as it is not mentioned in the text.
+
+
+Example: 39/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+वाल्मीकि द्वारा किए गए राजधानी कोशल के वर्णन से यह सुस्पष्ट है किअयोध्या की प्राचीन राजधानी हमारे आधुनिक शहरों से किसी भी तरह से कम नहीं थी।
+
+completion:
+Reference: from valmikis description of the capital of kosala it is clear that ancient ayodhya was not inferior to our modern cities
+Ground Truth: 
+
+As per the statement made by the government, it can be clearly shown that the ancient kingdom of Aydhya was much better than any of the modern towns.
+
+
+Example: 40/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+एक बार ऐसा कह देने पर कि 'मैं यह करूँगा', तुम्हारे पास इसे करने के अलावा कोई विकल्प नहीं रह जाता है।
+
+completion:
+Reference: having once said i will do you have no option but to do it
+Ground Truth: 
+"Once you say it, you'll have to do it, and there will be no alternative for you in this."
+
+
+Example: 41/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+हाल के वर्षों में, रुपये की विनिमय दर तथा विदेशी मुद्रा आरक्षित भंडार की पर्याप्तता पर भिन्न-भिन्न दृष्टिकोण सामने आए हैं।
+
+completion:
+Reference: in recent days there have been divergent views on the exchange rate of the rupee and the adequacy of our forex reserves
+Ground Truth: 
+
+In the last years, the exchange rate has been increasing, and the foreign exchange rate has been fluctuating.
+
+
+Example: 42/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+जब कोई क्रेडिट कार्ड खाता तीन दिन से अधिक पिछला बकाया दिखाता है, केवल तभी बैंक साख सूचना कंपनियों (सी.आई.सी.) को सूचित कर सकते हैं कि इसका पिछला बकाया है या देर से भुगतान शुल्क इत्यादि जैसा जुर्माना लगा सकते हैं।
+
+completion:
+Reference: banks shall report a credit card account as past due to credit information companies (cics) or levy penal charges viz late payment charges etc if any only when a credit card account remains past due for more than three days
+Ground Truth: 
+
+If the credit card account has been more than three days, only then the bank information company (CIS) can inform that the transaction is past due or a high interest rate or other fees as per the bank rules.
+
+
+Example: 43/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+देश अपनी आर्थिक स्थिति में सुधार करने हेतु विदेशों से प्रत्यक्ष निवेश को बढ़ावा दे सकते हैं।
+
+completion:
+Reference: countries may encourage inward direct investment to improve their finances
+Ground Truth: 
+
+"Can India attract more Foreign Direct investment to boost its economic situation?
+
+
+Example: 44/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+तथापि, पैकेज के त्वरित कार्यान्वयन के लिए प्रोत्साहन के रूप में,अगर अनुमोदित पैकेज बैंक द्वारा आवेदन प्राप्त करने के 90 दिनों के भीतर कार्यान्वित किया जाता है तो आस्ति वर्गीकरण की स्थिति बैंक द्वारा पुनर्रचना का आवेदन प्राप्त करने के समय वाले स्तर पर पुनः स्थापित की जा सकती है।
+
+completion:
+Reference: however as an incentive for quick implementation of the package if the approved package is implemented by the bank within 90 days from the date of receipt of the application by the bank the asset classification status may be restored to the position which existed when the restructuring application was received by the bank
+Ground Truth: 
+If the package has been completed within 30 days of the application, then the status of the bank can be updated to the level of the application for re-registration.
+
+Note: I have used the translation provided by Google, which is not always accurate, and it may not be the most accurate translation. A human translation would be more accurate, but I am not able AI to provide a human translation, as I am a machine translation tool.
+
+
+Example: 45/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+क्या निजी पूँजी संचय की गतिशीलता अनिवार्य रूप से धन के संकेन्द्रण को कुछ ही लोगों तक सीमित कर देती है, या विकास, प्रतियोगिता, तथा तकनीकी प्रगति की प्रतिकारी शक्तियों के परिणामस्वरूप असमानता कम होने लगती है?
+
+completion:
+Reference: do the dynamics of private capital accumulation inevitably lead to the concentration of wealth in fewer hands or do the balancing forces of growth competition and technological progress reduce inequality
+Ground Truth: 
+Do the vast majority of people limit the growth of their wealth, or is it just a few who do so, or is it the result of competition, competition, and technology progress?
+
+
+Example: 46/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+यह बाज़ार में अत्यधिक अस्थिरता को कम करने और स्फीति को अत्यधिक बढ़ने से रोकने के लिए हस्तक्षेप करता है।
+
+completion:
+Reference: it intervenes in the market to curb excessive volatility and anchor expectations
+Ground Truth: 
+
+This market reduces turmoility and increases efficiency for reducing turmoil and stopping the increase in ASS
+
+
+Example: 47/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+दूसरी तिमाही के उच्च आवृत्ति आँकड़े दर्शाते हैं कि आर्थिक संचालन अब भी मजबूत है।
+
+completion:
+Reference: highfrequency data for q2 indicates that economic activity remains resilient
+Ground Truth: 
+
+The second wave of inflation is visible in the high prices of goods.
+
+
+Example: 48/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+समष्टि अर्थशास्त्र में, विषय विशिष्ट रूप से एक राष्ट्र होता है और इसके बाज़ार किस प्रकार से उन व्यापक घटनाओं को उत्पन्न करने में एक-दूसरे को प्रभावित करते हैं जिसे अर्थशास्त्री समग्र चर कहते हैं।
+
+completion:
+Reference: in macroeconomics the subject is typically a nation and how all markets interact to generate big phenomena that economists call aggregate variables
+Ground Truth: 
+
+In arithmetic, a subject becomes a nation, and the market for its products affects another in a way that makes it a problem for the arithmetic teacher.
+
+Note: The original sentence is a bit unclear and may not make complete sense, but it is the best possible translation that can be made from the given words. A
+
+
+Example: 49/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+चल निधि का अर्थ है किस हद तक अल्पकाल में पूरे बाजार भाव से बहुत कम अंतर पर वित्तीय संपत्ति बेची जा सकती है।
+
+completion:
+Reference: liquidity refers to the extent to which financial assets can be sold at close to full market value at short notice
+Ground Truth: 
+"The meaning of the word "chal" is that in a market economy, it can be sold to a limited extent in a short time when the market is not fully in operation."
+
+Note: In the translation, the meaning of the word "chal" should be explained as it is not commonly used in English and may not be known to everyone. Also, the sentence should be translated in a way that it makes sense and convey the same meaning of the original sentence.
+
+Translation:
+In a market economy, a limited extent of the asset can be sold in a short market operation, when the market operation is not fully in operation.
+
+Note: In the sentence, the meaning of the word "chal" and the concept of market economy have been explained to make the translation clear.
+
+
+Example: 50/50
+Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
+
+मोटे तौर पर, आय मान्यता की नीति व्यक्तिनिष्ठ कारणों पर आधारित होने के बजाय वस्तुनिष्ठ और वसूली के विवरण पर आधारित होनी चाहिए।
+
+completion:
+Reference: broadly the policy of income recognition should be objective and based on the record of recovery rather than on any subjective considerations
+Ground Truth: 
+
+"On the large scale, human rights should be based on the reasons for their establishment rather than on the individual nature of the human being and the circumstances of their life."
+
+(Note: I had to make some changes to the sentence to make the translation accurate. The original sentence is a bit unclear, and I had to use my judgment to make the best sense of it. A
+
+
+BLEU: 0.15929908403026682
+ROUGE-1: 0.28110691991015413
+ROUGE-2: 0.06523011746383933
+ROUGE-LCS: 0.2161038644272806
+RTF: 0.371163589944834
