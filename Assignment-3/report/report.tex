@@ -15,6 +15,9 @@
 
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{algorithm}
+% \usepackage{algpseudocode}
+\usepackage{algorithmicx}
 
 \definecolor{codegray}{rgb}{0.9,0.9,0.9}
 \definecolor{keywordcolor}{rgb}{0.0,0.0,1.0}
@@ -216,7 +219,84 @@ class Trie:
 
 \section{Task 2 : Staring into Medusa's Heads}
 
-\bibliographystyle{plain}
-\bibliography{references}
+Speculative decoding is a technique designed to accelerate the inference process of Large Language Models (LLMs) by leveraging additional predictive heads to generate multiple future tokens in parallel. The Medusa architecture introduces multiple auxiliary heads, referred to as Medusa heads, which work alongside the standard Language Modeling (LM) head to predict tokens at different future time steps. This enables faster text generation by reducing the number of sequential steps required in the decoding process.
+
+\subsection{Medusa Architecture}
+
+The core idea behind Medusa is to introduce multiple linear layers, known as Medusa heads, that operate on the final hidden states of the LLM. Given an input sequence $y_{1:t-1}$:
+\begin{itemize}
+    \item The LM head predicts the next token $y_t$.
+    \item The first Medusa head predicts $y_{t+1}$.
+    \item The second Medusa head predicts $y_{t+2}$.
+    \item This continues up to the $K$th Medusa head, which predicts the $(t+K)$th token.
+\end{itemize}
+By leveraging these additional predictions, speculative decoding enables multiple tokens to be generated in parallel, leading to a significant speedup over traditional auto-regressive decoding.
+
+\subsection{Decoding Strategies}
+
+We explore two different decoding strategies based on Medusa:
+
+\subsubsection{Single Head Decoding}
+In this approach, only the LM head is used for inference. At each step, the model greedily selects the most probable token from the LM head’s output distribution and feeds it back as input to the LLM. This process repeats until the sequence is fully generated.
+
+\subsubsection{Multi Head Decoding}
+This approach utilizes Medusa heads to generate multiple future tokens in a single decoding step. The process consists of the following steps:
+
+\begin{enumerate}
+    \item \textbf{Step 1: Compute Probability Distributions} \\
+    Given an input sequence $y_{1:t-1}$, the LLM computes the probability distributions for the next $S+1$ tokens:
+    \begin{equation}
+        \{p_t, p_{t+1}, ..., p_{t+S}\}
+    \end{equation}
+    where $p_t$ is predicted by the LM head, and $p_{t+k}$ is predicted by the $k$th Medusa head.
+    
+    \item \textbf{Step 2: Beam Search over Future Tokens} \\
+    Beam search with beam width $W$ is applied over these probability distributions to generate $W$ candidate sequences. Each candidate sequence contains $S+1$ newly predicted tokens. 
+    \item \textbf{Step 3: Score Computation and Selection} \\
+    The LM head is used to compute scores for all candidate sequences. The final sequence is selected based on the highest cumulative log probability:
+    \begin{equation}
+        \text{Score} = \sum_{i=t}^{t+S} \log p_i[y_i]
+    \end{equation}
+    This process is repeated until an End-of-Sequence (EOS) token is encountered.
+\end{enumerate}
+
+
+\subsection{Performance Evaluation}
+To assess the effectiveness of speculative decoding, we evaluate BLEU and ROUGE scores along with the Real Time Factor (RTF) for different values of beam width ($W \in \{2, 5, 10\}$) and the number of Medusa heads ($S \in \{2, 5\}$). The results highlight the trade-offs between inference speed and output quality, as increasing $S$ leads to faster generation but may impact accuracy.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{|lccccc|}
+        \hline
+        \textbf{Method} & \textbf{BLEU} & \textbf{ROUGE-1} & \textbf{ROUGE-2} & \textbf{ROUGE-LCS} & \textbf{RTF} \\
+        \hline
+        Single Head (Greedy) & 0.2881 & 0.3994 & 0.1471 & 0.3166 & 0.1059 \\
+        \hline
+        Multi Head (W=2, S=2) & 0.2091 & 0.3213 & 0.0898 & 0.2530 & 0.1944 \\
+        Multi Head (W=2, S=5) & 0.2564 & 0.3700 & 0.1283 & 0.2958 & 0.2615 \\
+        Multi Head (W=5, S=2) & 0.1593 & 0.2811 & 0.0652 & 0.2161 & 0.3711 \\
+        Multi Head (W=5, S=5) & 0.2150 & 0.3461 & 0.1083 & 0.2783 & 0.3141 \\
+        % Multi Head (W=10, S=2) & 0.3099 & 0.3543 & 0.1296 & 0.2710 \\
+        % Multi Head (W=10, S=5) & 0.3099 & 0.3543 & 0.1296 & 0.2710 \\
+        \hline
+    \end{tabular}
+    \caption{Comparison of Single Head and Multi Head Decoding using BLEU and ROUGE scores}
+    \label{tab:medusa_comparison}
+\end{table}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{task2_single.png}
+    \caption{Task 2 - BLEU and ROUGE Scores for Single Headed Medusa}
+    \label{fig:task2_single}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{task2_multi.png}
+    \caption{Task 2 - BLEU and ROUGE Scores for Multi Headed Medusa}
+    \label{fig:task2_multi}
+\end{figure}
+
 
 \end{document}
