@@ -1,12 +1,4 @@
-Medusa single head
-BLEU: 0.04900113079532605
-ROUGE-1: 0.11460806096671955
-ROUGE-2: 0.0
-ROUGE-LCS: 0.09414709675034413
-RTF:2.2821812648740551e-07
-
-Medusa Multi-head
-
+Single head
 Example: 1/50
 Input Prompt: <s> You are an AI assistant whose purpose is to perform translation. Given the following sentence in Hindi, translate it to English:
 
