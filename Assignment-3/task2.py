@@ -1,4 +1,3 @@
-  GNU nano 5.4                                                                                                                                                                                                                       task2.py                                                                                                                                                                                                                                 
 import evaluate
 import torch 
 import numpy as np
