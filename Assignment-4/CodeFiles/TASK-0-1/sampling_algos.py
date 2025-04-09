@@ -32,6 +32,7 @@ class Algo1_Sampler:
         burnIn : number of initial samples to discard
         '''
         self.model = model
+        self.model.eval()
         self.tau = stepSize
         self.N = numSamples
         self.burnIn = burnIn
