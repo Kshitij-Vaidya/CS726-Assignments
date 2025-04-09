@@ -1,0 +1,260 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from math import erf, sqrt, pi
+# For numerical stability in inversion:
+import numpy.linalg as LA
+
+# ----------------------------------------------------------------------
+# 1. Black-Box Function: Branin-Hoo Function
+# Parameters for Branin-Hoo (commonly used values)
+def branin_hoo(x):
+    """
+    Compute the Branin-Hoo function value at x.
+    x: list or array with two elements [x1, x2]
+    """
+    x1, x2 = x[0], x[1]
+    a = 1.0
+    b = 5.1 / (4 * np.pi**2)
+    c = 5.0 / np.pi
+    r = 6.0
+    s = 10.0
+    t = 1.0 / (8.0 * np.pi)
+    return a * (x2 - b * x1**2 + c * x1 - r)**2 + s * (1 - t) * np.cos(x1) + s
+
+# ----------------------------------------------------------------------
+# 2. Kernel Functions
+def rbf_kernel(x1, x2, length_scale=1.0, sigma_f=1.0):
+    """
+    Compute the RBF kernel between sets x1 and x2.
+    x1: array of shape (n1, d)
+    x2: array of shape (n2, d)
+    Returns a kernel matrix of shape (n1, n2).
+    """
+    x1 = np.atleast_2d(x1)
+    x2 = np.atleast_2d(x2)
+    sqdist = np.sum(x1**2, axis=1).reshape(-1, 1) + np.sum(x2**2, axis=1) - 2 * np.dot(x1, x2.T)
+    return sigma_f**2 * np.exp(-0.5 * sqdist / (length_scale**2))
+
+def matern_kernel(x1, x2, length_scale=1.0, sigma_f=1.0, nu=1.5):
+    """
+    Compute the Matérn kernel with nu=1.5.
+    Formula: k(x,x') = sigma_f^2 * (1 + sqrt(3)*d/length_scale) * exp(-sqrt(3)*d/length_scale)
+    """
+    x1 = np.atleast_2d(x1)
+    x2 = np.atleast_2d(x2)
+    d = np.sqrt(np.sum((x1[:, None, :] - x2[None, :, :])**2, axis=2))
+    return sigma_f**2 * (1 + sqrt(3) * d / length_scale) * np.exp(-sqrt(3) * d / length_scale)
+
+def rational_quadratic_kernel(x1, x2, length_scale=1.0, sigma_f=1.0, alpha=1.0):
+    """
+    Compute the Rational Quadratic kernel.
+    Formula: k(x,x') = sigma_f^2 * (1 + (||x-x'||^2 / (2*alpha*length_scale^2)))^(-alpha)
+    """
+    x1 = np.atleast_2d(x1)
+    x2 = np.atleast_2d(x2)
+    sqdist = np.sum(x1**2, axis=1).reshape(-1, 1) + np.sum(x2**2, axis=1) - 2 * np.dot(x1, x2.T)
+    return sigma_f**2 * (1 + sqdist / (2 * alpha * length_scale**2)) ** (-alpha)
+
+# ----------------------------------------------------------------------
+# 3. Log-Marginal Likelihood
+def log_marginal_likelihood(x_train, y_train, kernel_func, length_scale, sigma_f, noise=1e-4):
+    """
+    Compute the log-marginal likelihood for the training data under the GP.
+    """
+    K = kernel_func(x_train, x_train, length_scale, sigma_f) + noise * np.eye(len(x_train))
+    try:
+        L = np.linalg.cholesky(K)
+    except np.linalg.LinAlgError:
+        # In case of non-positive definite matrix
+        return -np.inf
+    # Solve for alpha: K^{-1} y = L^{-T}(L^{-1} y)
+    alpha = LA.solve(L.T, LA.solve(L, y_train))
+    log_det = 2 * np.sum(np.log(np.diag(L)))
+    n = len(x_train)
+    return -0.5 * np.dot(y_train.T, alpha) - 0.5 * log_det - 0.5 * n * np.log(2 * np.pi)
+
+# ----------------------------------------------------------------------
+# 4. Hyperparameter Optimization (Grid Search)
+def optimize_hyperparameters(x_train, y_train, kernel_func, noise=1e-4):
+    """
+    Optimize kernel hyperparameters using grid search.
+    Returns the best (length_scale, sigma_f, noise).
+    For simplicity, we search over a small grid.
+    """
+    best_ll = -np.inf
+    best_params = (1.0, 1.0, noise)
+    for length_scale in [0.1, 1.0, 10.0]:
+        for sigma_f in [0.1, 1.0, 10.0]:
+            for n in [1e-4, 1e-3, 1e-2]:
+                ll = log_marginal_likelihood(x_train, y_train, kernel_func, length_scale, sigma_f, noise=n)
+                if ll > best_ll:
+                    best_ll = ll
+                    best_params = (length_scale, sigma_f, n)
+    print(f"Optimized params: length_scale={best_params[0]}, sigma_f={best_params[1]}, noise={best_params[2]}")
+    return best_params
+
+# ----------------------------------------------------------------------
+# 5. Gaussian Process Prediction
+def gaussian_process_predict(x_train, y_train, x_test, kernel_func, length_scale=1.0, sigma_f=1.0, noise=1e-4):
+    """
+    Perform GP regression.
+    x_train: (n, d), y_train: (n,)
+    x_test: (m, d)
+    Returns:
+      y_mean: (m,) predictive mean
+      y_std: (m,) predictive standard deviation
+    """
+    K = kernel_func(x_train, x_train, length_scale, sigma_f) + noise * np.eye(len(x_train))
+    K_s = kernel_func(x_train, x_test, length_scale, sigma_f)  # (n, m)
+    K_ss = kernel_func(x_test, x_test, length_scale, sigma_f) + 1e-8 * np.eye(len(x_test))
+    
+    # Cholesky decomposition for K
+    L = np.linalg.cholesky(K)
+    # Compute alpha = K^{-1} y_train using the Cholesky factors
+    alpha = LA.solve(L.T, LA.solve(L, y_train))
+    
+    # Predictive mean
+    y_mean = np.dot(K_s.T, alpha)
+    
+    # Solve for v: L v = K_s
+    v = LA.solve(L, K_s)
+    # Predictive variance: diag(K_ss - v^T v)
+    y_var = np.diag(K_ss) - np.sum(v**2, axis=0)
+    y_std = np.sqrt(np.maximum(y_var, 0))
+    return y_mean, y_std
+
+# ----------------------------------------------------------------------
+# 6. Acquisition Functions
+def phi(z):
+    """Standard Normal PDF."""
+    return np.exp(-0.5 * z**2) / np.sqrt(2 * np.pi)
+
+def Phi(z):
+    """Standard Normal CDF using the error function."""
+    return 0.5 * (1 + erf(z / sqrt(2)))
+
+def expected_improvement(mu, sigma, y_best, xi=0.01):
+    """
+    Compute the Expected Improvement (EI) acquisition function.
+    For minimization: improvement = y_best - mu - xi.
+    """
+    # Avoid division by zero:
+    sigma = np.maximum(sigma, 1e-8)
+    improvement = y_best - mu - xi
+    z = improvement / sigma
+    ei = improvement * np.vectorize(Phi)(z) + sigma * phi(z)
+    # Ensure no negative improvement:
+    return np.maximum(ei, 0)
+
+def probability_of_improvement(mu, sigma, y_best, xi=0.01):
+    """
+    Compute the Probability of Improvement (PI) acquisition function.
+    For minimization: PI = Phi((y_best - mu - xi) / sigma)
+    """
+    sigma = np.maximum(sigma, 1e-8)
+    z = (y_best - mu - xi) / sigma
+    return np.vectorize(Phi)(z)
+
+# ----------------------------------------------------------------------
+# 7. Plotting Function for Visualization
+def plot_graph(x1_grid, x2_grid, z_values, x_train, title, filename):
+    """
+    Create and save a filled contour plot with the training points overlaid.
+    x1_grid, x2_grid: grid arrays (e.g., from meshgrid)
+    z_values: 2D array of function values on the grid
+    x_train: training set coordinates (n,2)
+    title: plot title
+    filename: output filename for saving the plot
+    """
+    plt.figure(figsize=(8, 6))
+    contour = plt.contourf(x1_grid, x2_grid, z_values, cmap='viridis', levels=50)
+    plt.colorbar(contour)
+    plt.scatter(x_train[:, 0], x_train[:, 1], color='red', edgecolor='white', s=50)
+    plt.title(title)
+    plt.xlabel('x1')
+    plt.ylabel('x2')
+    plt.savefig(filename)
+    plt.close()
+
+# ----------------------------------------------------------------------
+# 8. Main Function
+def main():
+    np.random.seed(0)
+    n_samples_list = [10, 20, 50, 100]
+    
+    kernels = {
+        'rbf': (rbf_kernel, 'RBF'),
+        'matern': (matern_kernel, 'Matern (ν=1.5)'),
+        'rational_quadratic': (rational_quadratic_kernel, 'Rational Quadratic')
+    }
+    
+    acquisition_strategies = {
+        'EI': expected_improvement,
+        'PI': probability_of_improvement,
+        'None': None  # random acquisition as baseline
+    }
+    
+    # Create a grid for visualization:
+    x1_test = np.linspace(-5, 10, 100)
+    x2_test = np.linspace(0, 15, 100)
+    x1_grid, x2_grid = np.meshgrid(x1_test, x2_test)
+    x_test = np.c_[x1_grid.ravel(), x2_grid.ravel()]
+    # Compute true Branin-Hoo values on grid:
+    true_values = np.array([branin_hoo([x1, x2]) for x1, x2 in x_test]).reshape(x1_grid.shape)
+    
+    # For each kernel and sample size:
+    for kernel_name, (kernel_func, kernel_label) in kernels.items():
+        for n_samples in n_samples_list:
+            # Generate training points uniformly
+            x_train = np.random.uniform(low=[-5, 0], high=[10, 15], size=(n_samples, 2))
+            y_train = np.array([branin_hoo(x) for x in x_train])
+            
+            print(f"\nKernel: {kernel_label}, n_samples = {n_samples}")
+            length_scale, sigma_f, noise = optimize_hyperparameters(x_train, y_train, kernel_func)
+            
+            for acq_name, acq_func in acquisition_strategies.items():
+                # Copy initial training data for active learning:
+                x_train_current = x_train.copy()
+                y_train_current = y_train.copy()
+                
+                # Optionally perform a few active learning iterations:
+                if acq_func is not None:
+                    n_iterations = 5  # how many new acquisitions
+                    for _ in range(n_iterations):
+                        y_mean, y_std = gaussian_process_predict(x_train_current, y_train_current,
+                                                                   x_test, kernel_func, length_scale, sigma_f, noise)
+                        # For minimization, best is the smallest observed value:
+                        y_best = np.min(y_train_current)
+                        acq_values = acq_func(y_mean, y_std, y_best, xi=0.01)
+                        # Select the new point with highest acquisition value
+                        idx_new = np.argmax(acq_values)
+                        new_x = x_test[idx_new, :].reshape(1, -1)
+                        new_y = branin_hoo(new_x[0])
+                        # Update training set
+                        x_train_current = np.vstack([x_train_current, new_x])
+                        y_train_current = np.append(y_train_current, new_y)
+                
+                # Compute GP prediction with the (potentially) updated training set:
+                y_mean, y_std = gaussian_process_predict(x_train_current, y_train_current,
+                                                           x_test, kernel_func, length_scale, sigma_f, noise)
+                y_mean_grid = y_mean.reshape(x1_grid.shape)
+                y_std_grid = y_std.reshape(x1_grid.shape)
+                
+                acq_label = '' if acq_name == 'None' else f', Acq={acq_name}'
+                
+                # Plot and save the true function overlayed with training points:
+                plot_graph(x1_grid, x2_grid, true_values, x_train_current,
+                          f'True Branin-Hoo Function (n={n_samples}, Kernel={kernel_label}{acq_label})',
+                          f'true_function_{kernel_name}_n{n_samples}_{acq_name}.png')
+                # Plot GP predicted mean:
+                plot_graph(x1_grid, x2_grid, y_mean_grid, x_train_current,
+                          f'GP Predicted Mean (n={n_samples}, Kernel={kernel_label}{acq_label})',
+                          f'gp_mean_{kernel_name}_n{n_samples}_{acq_name}.png')
+                # Plot GP predicted standard deviation:
+                plot_graph(x1_grid, x2_grid, y_std_grid, x_train_current,
+                          f'GP Predicted Std Dev (n={n_samples}, Kernel={kernel_label}{acq_label})',
+                          f'gp_std_{kernel_name}_n{n_samples}_{acq_name}.png')
+                print(f"Saved plots for kernel {kernel_label}, n_samples {n_samples}, acquisition {acq_name}")
+
+if __name__ == "__main__":
+    main()
